@@ -421,20 +421,27 @@ body {
 
 function render() {
     const l = document.getElementById('listReg'); l.innerHTML = "";
+    const start = document.getElementById('filter_start').value;
+    const end = document.getElementById('filter_end').value;
+
     db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-        const all = e.target.result.filter(r => r.acc === curAcc);
+        let all = e.target.result.filter(r => r.acc === curAcc);
         
-        // 1. Calcular el saldo total acumulado hasta hoy para esta cuenta
+        if (start || end) {
+            all = all.filter(r => {
+                const rDate = r.date;
+                return (!start || rDate >= start) && (!end || rDate <= end);
+            });
+        }
+
         let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
 
-        // 2. Ordenar para mostrar: Cuotas pendientes arriba, luego por tiempo (más reciente primero)
         const sorted = all.sort((a,b) => {
             if(a.cat === '📅_cuotas' && a.status === 'pending' && b.cat !== '📅_cuotas') return -1;
             if(b.cat === '📅_cuotas' && b.status === 'pending' && a.cat !== '📅_cuotas') return 1;
             return b.ts - a.ts;
         });
 
-        // 3. Renderizar y descontar del saldo acumulado
         sorted.forEach(r => {
             let d = document.createElement('div');
             d.className = `reg-item ${r.cat==='📅_cuotas'&&r.status==='pending'?'prioridad':''}`;
@@ -442,12 +449,14 @@ function render() {
             
             let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
             
-            // El "Restante" se muestra antes de restar el monto del movimiento actual para el siguiente registro
+            // Indicador de facturas vinculadas (Clip)
+            let linkIcon = (r.kids && r.kids.length > 0) ? ' <span title="Tiene facturas vinculadas" style="color:var(--primary-p)">🔗</span>' : '';
+            
             d.innerHTML = `
                 <div class="reg-info">
                     <small>${r.date}</small>
                     <b>${r.cat.replace(/_/g,' ')}</b>
-                    <span>${r.desc}</span>
+                    <span>${r.desc}${linkIcon}</span>
                     ${extra}
                 </div>
                 <div style="text-align:right">
@@ -459,42 +468,66 @@ function render() {
                     </div>
                 </div>`;
             
-            // Actualizamos el balance para el registro que sigue en la lista (que es cronológicamente anterior)
             runningBalance -= r.amt;
-            
             d.onclick = () => showDetail(r);
             l.appendChild(d);
         });
     };
 }
 
-    async function showDetail(r) {
-        const modal = document.getElementById('modalGeneric');
-        const content = document.getElementById('modalContent');
-        let html = `<h3>Detalles del Movimiento</h3><p><b>Fecha:</b> ${r.date}</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto Total:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
+
+  async function showDetail(r) {
+    const modal = document.getElementById('modalGeneric');
+    const content = document.getElementById('modalContent');
+    let html = `<h3>Detalles del Movimiento</h3>
+                <p><b>Fecha:</b> ${r.date}</p>
+                <p><b>Descripción:</b> ${r.desc}</p>
+                <p><b>Monto Total:</b> $${Math.abs(r.amt).toFixed(2)}</p>
+                <p><b>Cuenta:</b> ${r.acc === 'personal' ? 'Personal' : 'Corriente'}</p><hr>`;
+    
+    if(r.cat === '📅_cuotas') {
+        html += `<h4>Historial de Abonos</h4>`;
+        const tx = db.transaction("trans","readonly").objectStore("trans");
+        const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
+        const abonos = all.filter(a => a.kids && a.kids.includes(r.id));
+        if(abonos.length > 0) {
+            abonos.forEach(a => { 
+                html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:5px 0;">
+                            <span>${a.date} - ${a.desc}</span>
+                            <b>$${Math.abs(a.amt).toFixed(2)}</b>
+                         </div>`; 
+            });
+        } else { 
+            html += `<p style="color:gray; font-size:0.85rem;">No se han registrado abonos aún.</p>`; 
+        }
+        html += `<p style="margin-top:10px;"><b>Estado:</b> ${r.cuotas_pagadas}/${r.total_cuotas} cuotas pagadas.</p>`;
+    } 
+    else if(r.kids && r.kids.length > 0) {
+        html += `<h4>Facturas Liquidadas</h4>`;
+        const tx = db.transaction("trans","readonly").objectStore("trans");
+        const st = tx.objectStore("trans");
         
-        if(r.cat === '📅_cuotas') {
-            html += `<h4>Historial de Abonos</h4>`;
-            const tx = db.transaction("trans","readonly").objectStore("trans");
-            const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
-            const abonos = all.filter(a => a.kids && a.kids.includes(r.id));
-            if(abonos.length > 0) {
-                abonos.forEach(a => { html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:5px 0;"><span>${a.date} - ${a.desc}</span><b>$${Math.abs(a.amt).toFixed(2)}</b></div>`; });
-            } else { html += `<p style="color:gray; font-size:0.85rem;">No se han registrado abonos aún.</p>`; }
-            html += `<p style="margin-top:10px;"><b>Estado:</b> ${r.cuotas_pagadas}/${r.total_cuotas} cuotas pagadas.</p>`;
-        } else if(r.kids && r.kids.length > 0) {
-            html += `<h4>Facturas Liquidadas</h4>`;
-            const tx = db.transaction("trans","readonly").objectStore("trans");
-            for(let id of r.kids) {
-                const sub = await new Promise(res => { tx.get(id).onsuccess = (ev) => res(ev.target.result); });
-                if(sub) html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem;"><span>${sub.desc}</span><b>$${(Math.abs(sub.amt)/ (sub.total_cuotas || 1)).toFixed(2)}</b></div>`;
+        for(let id of r.kids) {
+            const sub = await new Promise(res => { 
+                const req = st.get(id);
+                req.onsuccess = (ev) => res(ev.target.result);
+                req.onerror = () => res(null);
+            });
+            
+            if(sub) {
+                html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:4px 0;">
+                            <span>[${sub.acc.toUpperCase()}] ${sub.desc}</span>
+                            <b>$${(Math.abs(sub.amt)/ (sub.total_cuotas || 1)).toFixed(2)}</b>
+                         </div>`;
             }
         }
-        html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar</button>`;
-        content.innerHTML = html;
-        modal.classList.add('show');
     }
 
+    html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar</button>`;
+    
+    content.innerHTML = html;
+    modal.classList.add('show');
+}
 
     // --- FUNCIONES DE RESPALDO (JSON) ---
 function exportData() {
