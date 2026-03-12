@@ -3,191 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finanzas Daniel Pro - v2.7</title>
+    <title>Finanzas Daniel Pro - v2.8</title>
     <style>
+        :root {
+            --primary-p: #2563eb; 
+            --primary-c: #FCDB3F; 
+            --bg: #F0F3F7;
+            --text-dark: #1e293b; 
+            --danger: #ef4444; 
+            --success: #10b981;
+        }
 
-:root {
-    --primary-p: #2563eb; 
-    --primary-c: #FCDB3F; 
-    --bg: #F0F3F7;
-    --text-dark: #1e293b; 
-    --danger: #ef4444; 
-    --success: #10b981;
-}
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding-bottom: 90px; 
+            display: flex; 
+            justify-content: center; 
+        }
 
-body { 
-    font-family: 'Segoe UI', sans-serif; 
-    background: var(--bg); 
-    margin: 0; 
-    padding-bottom: 90px; 
-    display: flex; 
-    justify-content: center; 
-}
+        .app-container { 
+            width: 100%; 
+            max-width: 450px; 
+            padding: 15px; 
+            box-sizing: border-box; 
+        }
 
-/* Contenedor Adaptable */
-.app-container { 
-    width: 100%; 
-    max-width: 450px; /* Base para Celular */
-    padding: 15px; 
-    box-sizing: border-box; 
-    transition: max-width 0.3s ease;
-}
+        .tab-content { display: none; width: 100%; }
+        .tab-content.active { display: block; }
 
-.tab-content { display: none; width: 100%; }
-.tab-content.active { display: block; }
+        .main-card { 
+            background: var(--primary-p); 
+            color: white; 
+            padding: 25px; 
+            border-radius: 20px; 
+            text-align: center; 
+            margin-bottom: 15px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+        }
 
-/* Tarjeta Principal */
-.main-card { 
-    background: var(--primary-p); 
-    color: white; 
-    padding: 25px; 
-    border-radius: 20px; 
-    text-align: center; 
-    margin-bottom: 15px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
-}
+        .main-card.corriente-mode { background: var(--primary-c); color: var(--text-dark); }
+        .main-card h1 { font-size: 2.8rem; margin: 10px 0; font-weight: bold; }
 
-.main-card.corriente-mode { background: var(--primary-c); color: var(--text-dark); }
+        .pill { 
+            background: rgba(0,0,0,0.1); 
+            padding: 6px 12px; 
+            border-radius: 12px; 
+            font-size: 0.8rem; 
+            margin: 4px 0; 
+            display: inline-block; 
+        }
 
-.main-card h1 { 
-    font-size: 2.8rem; /* Tamaño Celular */
-    margin: 10px 0; 
-    font-weight: bold; 
-}
+        .info-panel { 
+            background: #fef9c3; 
+            border: 1px solid #fde047; 
+            padding: 15px; 
+            border-radius: 15px; 
+            margin-bottom: 20px; 
+            display: grid; 
+            grid-template-columns: 1fr 1fr 1fr; 
+            gap: 10px; 
+            text-align: center; 
+            font-size: 0.75rem; 
+            color: #854d0e; 
+        }
 
-.pill { 
-    background: rgba(0,0,0,0.1); 
-    padding: 6px 12px; 
-    border-radius: 12px; 
-    font-size: 0.8rem; 
-    margin: 4px 0; 
-    display: inline-block; 
-}
+        .acc-selector { display: flex; background: #E2E8F0; padding: 5px; border-radius: 12px; margin-bottom: 20px; }
+        .acc-btn { flex: 1; padding: 12px; border: none; background: transparent; color: #64748b; font-weight: 600; cursor: pointer; border-radius: 10px; }
+        .acc-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-.info-panel { 
-    background: #fef9c3; 
-    border: 1px solid #fde047; 
-    padding: 15px; 
-    border-radius: 15px; 
-    margin-bottom: 20px; 
-    display: grid; 
-    grid-template-columns: 1fr 1fr 1fr; 
-    gap: 10px; 
-    text-align: center; 
-    font-size: 0.75rem; 
-    color: #854d0e; 
-}
+        .form-card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 5px; font-size: 0.85rem; font-weight: 600; color: #64748b; }
 
-.acc-selector { display: flex; background: #E2E8F0; padding: 5px; border-radius: 12px; margin-bottom: 20px; }
+        .input-ctrl { width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 1rem; box-sizing: border-box; outline: none; }
+        .btn-save { width: 100%; padding: 18px; border-radius: 12px; border: none; background: var(--primary-p); color: white; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
 
-.acc-btn { 
-    flex: 1; 
-    padding: 12px; 
-    border: none; 
-    background: transparent; 
-    color: #64748b; 
-    font-weight: 600; 
-    cursor: pointer; 
-    border-radius: 10px; 
-    font-size: 0.9rem;
-}
+        .reg-item { 
+            background: white; 
+            padding: 15px; 
+            margin-bottom: 10px; 
+            border-radius: 12px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-left: 6px solid; 
+            cursor: pointer;
+            position: relative;
+        }
 
-.acc-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .reg-info b { display: block; font-size: 0.9rem; text-transform: uppercase; color: var(--text-dark); }
+        .edit-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 5px; margin-left: 10px; }
 
-.form-card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-.form-group { margin-bottom: 15px; }
-.form-label { display: block; margin-bottom: 5px; font-size: 0.85rem; font-weight: 600; color: #64748b; }
+        .tab-bar { position: fixed; bottom: 0; width: 100%; max-width: 450px; background: white; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #e2e8f0; border-radius: 20px 20px 0 0; }
+        .tab-item { border: none; background: none; color: #64748b; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .tab-item.active { color: var(--primary-p); font-weight: bold; }
 
-.input-ctrl { 
-    width: 100%; 
-    padding: 14px; 
-    border: 1px solid #e2e8f0; 
-    border-radius: 12px; 
-    font-size: 1rem; 
-    box-sizing: border-box; 
-    outline: none; 
-}
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; visibility: hidden; opacity: 0; transition: 0.2s; }
+        .modal-overlay.show { visibility: visible; opacity: 1; }
+        .modal-body { background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 20px; max-height: 80vh; overflow-y: auto; }
+        .hidden { display: none; }
+        
+        .status-pill { font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; margin-left: 5px; font-weight: bold; }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-pending { background: #fee2e2; color: #991b1b; }
 
-.btn-save { 
-    width: 100%; 
-    padding: 18px; 
-    border-radius: 12px; 
-    border: none; 
-    background: var(--primary-p); 
-    color: white; 
-    font-size: 1.1rem; 
-    font-weight: bold; 
-    cursor: pointer; 
-}
-
-.reg-item { 
-    background: white; 
-    padding: 15px; 
-    margin-bottom: 10px; 
-    border-radius: 12px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    border-left: 6px solid; 
-    cursor: pointer; 
-}
-
-.reg-info b { display: block; font-size: 0.9rem; text-transform: uppercase; color: var(--text-dark); }
-
-.tab-bar { 
-    position: fixed; 
-    bottom: 0; 
-    width: 100%; 
-    max-width: 450px; 
-    background: white; 
-    display: flex; 
-    justify-content: space-around; 
-    padding: 12px 0; 
-    border-top: 1px solid #e2e8f0; 
-    border-radius: 20px 20px 0 0; 
-}
-
-.tab-item { border: none; background: none; color: #64748b; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-.tab-item.active { color: var(--primary-p); font-weight: bold; }
-
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; visibility: hidden; opacity: 0; transition: 0.2s; }
-.modal-overlay.show { visibility: visible; opacity: 1; }
-.modal-body { background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 20px; max-height: 80vh; overflow-y: auto; }
-.hidden { display: none; }
-
-/* =============================================
-   CONFIGURACIÓN PARA TABLET (iPad / Pantallas > 600px)
-   ============================================= */
-@media screen and (min-width: 600px) {
-    .app-container, .tab-bar { 
-        max-width: 800px; 
-    }
-    
-    body { padding-bottom: 110px; }
-
-    .main-card { padding: 40px; }
-    .main-card h1 { font-size: 4.5rem; }
-    .pill { font-size: 1.1rem; padding: 10px 20px; }
-    
-    .info-panel { font-size: 1rem; padding: 25px; }
-    
-    .acc-btn { padding: 18px; font-size: 1.2rem; }
-    
-    .form-card { padding: 35px; }
-    .form-label { font-size: 1rem; }
-    .input-ctrl { font-size: 1.2rem; padding: 18px; }
-    
-    .btn-save { padding: 22px; font-size: 1.3rem; }
-    
-    .reg-item { padding: 22px; }
-    .reg-info b { font-size: 1.1rem; }
-    .reg-info span { font-size: 1rem; }
-    
-    .tab-item { font-size: 1.1rem; }
-    .tab-bar { padding: 18px 0; }
-}
-
-
+        @media screen and (min-width: 600px) {
+            .app-container, .tab-bar { max-width: 800px; }
+        }
     </style>
 </head>
 <body>
@@ -209,32 +133,30 @@ body {
         </div>
         <div class="form-card">
             <div class="form-group"><label class="form-label">Fecha</label><input type="date" id="f_date" class="input-ctrl"></div>
-            <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="f_desc" class="input-ctrl" placeholder="Descripción del movimiento"></div>
+            <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="f_desc" class="input-ctrl" placeholder="Descripción"></div>
             <div class="form-group"><label class="form-label">Categoría</label><select id="f_cat" class="input-ctrl" onchange="handleCat(this.value)"></select></div>
             <div id="grpCuotas" class="form-group hidden"><label class="form-label">Total de cuotas</label><input type="number" id="f_cuotas" class="input-ctrl" placeholder="Ej: 3"></div>
             <div class="form-group"><label class="form-label">Monto</label><input type="number" id="f_amt" class="input-ctrl" placeholder="0.00" step="0.01"></div>
             <button class="btn-save" id="saveBtn" onclick="doSave()">Guardar Registro</button>
         </div>
     </div>
-<div id="tab-registros" class="tab-content">
-    <h2 style="color:var(--primary-p); margin-bottom:15px;">Historial de Movimientos</h2>
-    
-    <div style="background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <button onclick="exportData()" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.8rem; cursor: pointer;">📤 Exportar JSON</button>
-            <button onclick="document.getElementById('fileInput').click()" style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.8rem; cursor: pointer;">📥 Importar JSON</button>
-            <input type="file" id="fileInput" class="hidden" accept=".json" onchange="importData(event)">
-        </div>
-        
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="date" id="filter_start" class="input-ctrl" style="padding: 8px; font-size: 0.8rem;">
-            <span style="font-size: 0.8rem; color: #64748b;">a</span>
-            <input type="date" id="filter_end" class="input-ctrl" style="padding: 8px; font-size: 0.8rem;">
-            <button onclick="render()" style="background: var(--primary-p); color: white; border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer;">🔍</button>
-        </div>
-    </div>
 
-    <div id="listReg"></div>
+    <div id="tab-registros" class="tab-content">
+        <h2 style="color:var(--primary-p); margin-bottom:15px;">Historial</h2>
+        <div style="background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button onclick="exportData()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc;">📤 Exportar</button>
+                <button onclick="document.getElementById('fileInput').click()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc;">📥 Importar</button>
+                <input type="file" id="fileInput" class="hidden" accept=".json" onchange="importData(event)">
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <input type="date" id="filter_start" class="input-ctrl" style="padding: 8px;">
+                <input type="date" id="filter_end" class="input-ctrl" style="padding: 8px;">
+                <button onclick="render()" style="background: var(--primary-p); color: white; border: none; padding: 8px 15px; border-radius: 8px;">🔍</button>
+            </div>
+        </div>
+        <div id="listReg"></div>
+    </div>
 </div>
 
 <nav class="tab-bar">
@@ -248,7 +170,6 @@ body {
 
 <script>
     let db, curAcc = 'personal', selIds = [], selNames = [], tSum = 0;
-    // REGLA: "Pago Tarjeta" ahora está fuera de incomeRules para que reste
     const incomeRules = ['quincena', 'ahorro', '💳_pago', '🤑_pago_prestamo'];
 
     const request = indexedDB.open("FinanzasDanielDB", 2);
@@ -297,30 +218,25 @@ body {
     function openConciliacion(cat) {
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
-        selIds = []; tSum = 0;
+        selIds = []; tSum = 0; selNames = [];
         let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
         let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
 
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
             const pending = e.target.result.filter(r => r.acc === targetAcc && r.amt < 0 && r.status === 'pending' && targetCats.includes(r.cat));
             content.innerHTML = `<h3>Liquidar Pendientes</h3><div id="pList"></div>
-                <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px;">
-                    Total a pagar: <b id="tS" style="color:var(--primary-p); font-size:1.2rem;">$0.00</b>
-                </div>
+                <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px;">Total: <b id="tS">$0.00</b></div>
                 <button onclick="applyCon()" class="btn-save" style="margin-top:15px;">Cargar Pago</button>
-                <button onclick="closeModal()" style="width:100%; background:none; border:none; margin-top:10px; color:gray">Cancelar</button>`;
+                <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray">Cancelar</button>`;
             
             const list = document.getElementById('pList');
             pending.forEach(r => {
                 let cuotaAmt = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
-                let faltante = r.cat === '📅_cuotas' ? (Math.abs(r.amt) - (cuotaAmt * r.cuotas_pagadas)) : 0;
-                let infoExtra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--danger)">Cuota: $${cuotaAmt.toFixed(2)} | Restante: $${(faltante-cuotaAmt).toFixed(2)}</small>` : '';
-                
                 let d = document.createElement('div');
-                d.style = "padding:12px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:12px;";
-                d.innerHTML = `<input type="checkbox" style="width:20px; height:20px" onchange="tick(${r.id},${cuotaAmt},'${r.desc}')"> 
-                               <div style="flex:1"><b>${r.desc}</b><br><small>${r.cat.replace(/_/g,' ')} ${r.cat==='📅_cuotas' ? (r.cuotas_pagadas+1)+'/'+r.total_cuotas : ''}</small>${infoExtra}</div>
-                               <div style="font-weight:bold">$${cuotaAmt.toFixed(2)}</div>`;
+                d.style = "padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;";
+                d.innerHTML = `<input type="checkbox" onchange="tick(${r.id},${cuotaAmt},'${r.desc}')"> 
+                               <div style="flex:1"><b>${r.desc}</b><br><small>${r.cat}</small></div>
+                               <b>$${cuotaAmt.toFixed(2)}</b>`;
                 list.appendChild(d);
             });
             modal.classList.add('show');
@@ -329,24 +245,14 @@ body {
 
     function tick(id, m, name) {
         const i = selIds.indexOf(id);
-        if(i > -1) { 
-            selIds.splice(i,1); 
-            selNames.splice(selNames.indexOf(name), 1);
-            tSum -= m; 
-        } else { 
-            selIds.push(id); 
-            selNames.push(name);
-            tSum += m; 
-        }
+        if(i > -1) { selIds.splice(i,1); selNames.splice(selNames.indexOf(name),1); tSum -= m; } 
+        else { selIds.push(id); selNames.push(name); tSum += m; }
         document.getElementById('tS').innerText = `$${tSum.toFixed(2)}`;
     }
 
     function applyCon() { 
         document.getElementById('f_amt').value = tSum.toFixed(2);
-        // MODIFICACIÓN: Si solo hay un item seleccionado, copiar la descripción
-        if(selIds.length === 1) {
-            document.getElementById('f_desc').value = selNames[0];
-        }
+        if(selIds.length === 1) document.getElementById('f_desc').value = selNames[0];
         closeModal(); 
     }
 
@@ -358,52 +264,30 @@ body {
         if(!de || isNaN(am)) return alert("Datos incompletos");
 
         const tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
+        let finalAmt = (incomeRules.some(r => ca.includes(r)) && ca !== '💳_pago_tarjeta') ? am : -am;
 
-        // REGLA DE SIGNO CORREGIDA: "💳_pago_tarjeta" DEBE SER NEGATIVO EN PERSONAL
-        let finalAmt = -am; 
-        if (incomeRules.includes(ca) || ca.includes('quincena') || ca.includes('ahorro')|| ca.includes('💳_pago')) {
-            finalAmt = am;
-        }
-        if (ca === '💳_pago_tarjeta') finalAmt = -am; // Forzar que sea resta
-
-        const entry = { date:d, desc:de, cat:ca, amt: finalAmt, acc:curAcc, status:'pending', kids: [...selIds], ts:Date.now() };
-
+        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, status:'pending', kids:[...selIds], ts:Date.now() };
         if (ca === '📅_cuotas') { entry.total_cuotas = parseInt(document.getElementById('f_cuotas').value) || 1; entry.cuotas_pagadas = 0; }
 
-        // LÓGICA DE PARTIDA DOBLE (Transferencia automática Personal -> Corriente)
-       if (curAcc === 'personal' && ca === '💳_pago_tarjeta') {
-            const mirror = { date:d, desc: `PAGO DE TARJETA (${de})`, cat: '💳_pago', amt: am, acc: 'corriente', status:'paid', ts:Date.now() + 1 };
-            st.add(mirror);
+        if (curAcc === 'personal' && ca === '💳_pago_tarjeta') {
+            st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', status:'paid', ts:Date.now() + 1 });
         }
 
-
         selIds.forEach(id => {
-            let req = st.get(id);
-            req.onsuccess = () => { 
-                let res = req.result; 
+            st.get(id).onsuccess = (e) => {
+                let res = e.target.result;
                 if (res.cat === '📅_cuotas') {
                     res.cuotas_pagadas++;
                     if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
                 } else { res.status = 'paid'; }
-                st.put(res); 
+                st.put(res);
             };
         });
 
-        st.add(entry).onsuccess = () => { 
-             
-            document.getElementById('f_desc').value=''; 
-            document.getElementById('f_amt').value=''; 
-            document.getElementById('f_cuotas').value=''; 
-            selIds=[];
-            resetUI();
-            refresh(); 
-        };
+        st.add(entry).onsuccess = () => { resetUI(); refresh(); };
     }
 
-    function resetUI() {
-        document.getElementById('f_desc').value=''; document.getElementById('f_amt').value=''; 
-        document.getElementById('f_cuotas').value=''; selIds=[]; selNames=[];
-    }
+    function resetUI() { document.getElementById('f_desc').value=''; document.getElementById('f_amt').value=''; document.getElementById('f_cuotas').value=''; selIds=[]; selNames=[]; }
 
     function refresh() {
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
@@ -419,175 +303,122 @@ body {
         };
     }
 
-function render() {
-    const l = document.getElementById('listReg'); l.innerHTML = "";
-    db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-        const all = e.target.result.filter(r => r.acc === curAcc);
-        
-        // 1. Calcular el saldo total acumulado hasta hoy para esta cuenta
-        let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
+    function render() {
+        const l = document.getElementById('listReg'); l.innerHTML = "";
+        const start = document.getElementById('filter_start').value;
+        const end = document.getElementById('filter_end').value;
 
-        // 2. Ordenar para mostrar: Cuotas pendientes arriba, luego por tiempo (más reciente primero)
-        const sorted = all.sort((a,b) => {
-            if(a.cat === '📅_cuotas' && a.status === 'pending' && b.cat !== '📅_cuotas') return -1;
-            if(b.cat === '📅_cuotas' && b.status === 'pending' && a.cat !== '📅_cuotas') return 1;
-            return b.ts - a.ts;
-        });
+        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
+            let all = e.target.result.filter(r => r.acc === curAcc);
+            if (start || end) all = all.filter(r => (!start || r.date >= start) && (!end || r.date <= end));
 
-        // 3. Renderizar y descontar del saldo acumulado
-        sorted.forEach(r => {
-            let d = document.createElement('div');
-            d.className = `reg-item ${r.cat==='📅_cuotas'&&r.status==='pending'?'prioridad':''}`;
-            d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
-            
-            let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
-            
-            // El "Restante" se muestra antes de restar el monto del movimiento actual para el siguiente registro
-            d.innerHTML = `
-                <div class="reg-info">
-                    <small>${r.date}</small>
-                    <b>${r.cat.replace(/_/g,' ')}</b>
-                    <span>${r.desc}</span>
-                    ${extra}
-                </div>
-                <div style="text-align:right">
-                    <div style="font-weight:bold; font-size:1.1rem; color:${r.amt>0?'var(--success)':'var(--danger)'}">
-                        ${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}
+            let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
+            const sorted = all.sort((a,b) => b.ts - a.ts);
+
+            sorted.forEach(r => {
+                let d = document.createElement('div');
+                d.className = `reg-item`;
+                d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
+                
+                let st = r.amt < 0 ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
+                let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
+                
+                d.innerHTML = `
+                    <div class="reg-info">
+                        <small>${r.date} ${st}</small>
+                        <b>${r.cat.replace(/_/g,' ')}</b>
+                        <span>${r.desc}</span>${extra}
                     </div>
-                    <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:4px;">
-                        Saldo: $${runningBalance.toFixed(2)}
+                    <div style="text-align:right; margin-right:30px">
+                        <div style="font-weight:bold; color:${r.amt>0?'var(--success)':'var(--danger)'}">${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}</div>
+                        <div style="font-size:0.7rem; color:gray">Saldo: $${runningBalance.toFixed(2)}</div>
                     </div>
-                </div>`;
-            
-            // Actualizamos el balance para el registro que sigue en la lista (que es cronológicamente anterior)
-            runningBalance -= r.amt;
-            
-            d.onclick = () => showDetail(r);
-            l.appendChild(d);
-        });
-    };
-}
+                    <button class="edit-btn">✏️</button>`;
+                
+                d.onclick = () => showDetail(r.id);
+                d.querySelector('.edit-btn').onclick = (ev) => { ev.stopPropagation(); editReg(r.id); };
 
-    async function showDetail(r) {
+                runningBalance -= r.amt;
+                l.appendChild(d);
+            });
+        };
+    }
+
+    async function showDetail(id) {
+        const tx = db.transaction("trans","readonly").objectStore("trans");
+        const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
+        const r = all.find(item => item.id === id);
+        if(!r) return;
+
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
-        let html = `<h3>Detalles del Movimiento</h3><p><b>Fecha:</b> ${r.date}</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto Total:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
+        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()}</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
         
-        if(r.cat === '📅_cuotas') {
-            html += `<h4>Historial de Abonos</h4>`;
-            const tx = db.transaction("trans","readonly").objectStore("trans");
-            const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
-            const abonos = all.filter(a => a.kids && a.kids.includes(r.id));
-            if(abonos.length > 0) {
-                abonos.forEach(a => { html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem; padding:5px 0;"><span>${a.date} - ${a.desc}</span><b>$${Math.abs(a.amt).toFixed(2)}</b></div>`; });
-            } else { html += `<p style="color:gray; font-size:0.85rem;">No se han registrado abonos aún.</p>`; }
-            html += `<p style="margin-top:10px;"><b>Estado:</b> ${r.cuotas_pagadas}/${r.total_cuotas} cuotas pagadas.</p>`;
-        } else if(r.kids && r.kids.length > 0) {
-            html += `<h4>Facturas Liquidadas</h4>`;
-            const tx = db.transaction("trans","readonly").objectStore("trans");
-            for(let id of r.kids) {
-                const sub = await new Promise(res => { tx.get(id).onsuccess = (ev) => res(ev.target.result); });
-                if(sub) html += `<div style="display:flex; justify-content:space-between; font-size:0.85rem;"><span>${sub.desc}</span><b>$${(Math.abs(sub.amt)/ (sub.total_cuotas || 1)).toFixed(2)}</b></div>`;
-            }
+        const parent = all.find(p => p.kids && p.kids.includes(r.id));
+        if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por:</small><br><b>${parent.desc}</b> (${parent.acc})</div>`;
+
+        if(r.kids && r.kids.length > 0) {
+            html += `<h4>Liquidó a:</h4>`;
+            r.kids.forEach(kId => {
+                const kid = all.find(k => k.id === kId);
+                if(kid) html += `<div style="font-size:0.8rem; border-bottom:1px solid #eee; padding:4px 0;">${kid.desc} ($${(Math.abs(kid.amt)/(kid.total_cuotas||1)).toFixed(2)})</div>`;
+            });
         }
+        
         html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar</button>`;
         content.innerHTML = html;
         modal.classList.add('show');
     }
 
+    function editReg(id) {
+        db.transaction("trans","readonly").objectStore("trans").get(id).onsuccess = (e) => {
+            const r = e.target.result;
+            const content = document.getElementById('modalContent');
+            content.innerHTML = `<h3>Editar</h3>
+                <div class="form-group"><label>Descripción</label><input type="text" id="ed_desc" class="input-ctrl" value="${r.desc}"></div>
+                <div class="form-group"><label>Monto</label><input type="number" id="ed_amt" class="input-ctrl" value="${Math.abs(r.amt)}"></div>
+                <button onclick="saveEdit(${r.id})" class="btn-save">Guardar</button>
+                <button onclick="deleteReg(${r.id})" style="width:100%; color:red; margin-top:10px; background:none; border:none;">🗑️ Eliminar</button>
+                <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; background:none;">Cancelar</button>`;
+            document.getElementById('modalGeneric').classList.add('show');
+        };
+    }
 
-    // --- FUNCIONES DE RESPALDO (JSON) ---
-function exportData() {
-    const tx = db.transaction("trans", "readonly");
-    tx.objectStore("trans").getAll().onsuccess = (e) => {
-        const data = JSON.stringify(e.target.result, null, 2);
-        const blob = new Blob([data], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `finanzas_daniel_backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-    };
-}
+    function saveEdit(id) {
+        const tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
+        st.get(id).onsuccess = (e) => {
+            const r = e.target.result;
+            r.desc = document.getElementById('ed_desc').value;
+            const nAmt = parseFloat(document.getElementById('ed_amt').value);
+            r.amt = r.amt < 0 ? -nAmt : nAmt;
+            st.put(r);
+            tx.oncomplete = () => { closeModal(); render(); refresh(); };
+        };
+    }
 
-function importData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            const tx = db.transaction("trans", "readwrite");
-            const st = tx.objectStore("trans");
-            st.clear(); // Limpia la base actual antes de importar
-            data.forEach(item => {
-                delete item.id; // Deja que IndexedDB genere nuevos IDs
-                st.add(item);
-            });
-            tx.oncomplete = () => { alert("Importación exitosa"); render(); refresh(); };
-        } catch (err) { alert("Error al leer el archivo"); }
-    };
-    reader.readAsText(file);
-}
+    function deleteReg(id) {
+        if(!confirm("¿Borrar registro?")) return;
+        const tx = db.transaction("trans", "readwrite");
+        tx.objectStore("trans").delete(id).oncomplete = () => { closeModal(); render(); refresh(); };
+    }
 
-// --- ACTUALIZACIÓN DE RENDER CON FILTRO ---
-function render() {
-    const l = document.getElementById('listReg'); l.innerHTML = "";
-    const start = document.getElementById('filter_start').value;
-    const end = document.getElementById('filter_end').value;
+    function exportData() {
+        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
+            const blob = new Blob([JSON.stringify(e.target.result, null, 2)], { type: "application/json" });
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
+        };
+    }
 
-    db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-        let all = e.target.result.filter(r => r.acc === curAcc);
-        
-        // Aplicar filtro de fecha si existen valores
-        if (start || end) {
-            all = all.filter(r => {
-                const rDate = r.date; // Formato YYYY-MM-DD
-                return (!start || rDate >= start) && (!end || rDate <= end);
-            });
-        }
-
-        // Lógica de saldo acumulado (Running Balance)
-        let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
-
-        const sorted = all.sort((a,b) => {
-            if(a.cat === '📅_cuotas' && a.status === 'pending' && b.cat !== '📅_cuotas') return -1;
-            if(b.cat === '📅_cuotas' && b.status === 'pending' && a.cat !== '📅_cuotas') return 1;
-            return b.ts - a.ts;
-        });
-
-        sorted.forEach(r => {
-            let d = document.createElement('div');
-            d.className = `reg-item ${r.cat==='📅_cuotas'&&r.status==='pending'?'prioridad':''}`;
-            d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
-            
-            let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
-            
-            d.innerHTML = `
-                <div class="reg-info">
-                    <small>${r.date}</small>
-                    <b>${r.cat.replace(/_/g,' ')}</b>
-                    <span>${r.desc}</span>
-                    ${extra}
-                </div>
-                <div style="text-align:right">
-                    <div style="font-weight:bold; font-size:1.1rem; color:${r.amt>0?'var(--success)':'var(--danger)'}">
-                        ${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}
-                    </div>
-                    <div style="font-size:0.75rem; color:#64748b; font-weight:600; margin-top:4px;">
-                        Saldo: $${runningBalance.toFixed(2)}
-                    </div>
-                </div>`;
-            
-            runningBalance -= r.amt;
-            d.onclick = () => showDetail(r);
-            l.appendChild(d);
-        });
-    };
-}
-
+    function importData(event) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = JSON.parse(e.target.result), tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
+            st.clear();
+            data.forEach(item => { delete item.id; st.add(item); });
+            tx.oncomplete = () => { alert("Importado"); render(); refresh(); };
+        };
+        reader.readAsText(event.target.files[0]);
+    }
 </script>
 </body>
-
 </html>
-
