@@ -347,14 +347,14 @@
     async function showDetail(id) {
         const tx = db.transaction("trans","readonly").objectStore("trans");
         const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
-        const r = all.find(item => item.id === id);
+        const r = all.find(item => item.id == id);
         if(!r) return;
 
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
         let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()}</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
         
-        const parent = all.find(p => p.kids && p.kids.includes(r.id));
+        const parent = all.find(p => p.kids && p.kids.includes(Number(id)));
         if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por:</small><br><b>${parent.desc}</b> (${parent.acc})</div>`;
 
         if(r.kids && r.kids.length > 0) {
@@ -409,16 +409,36 @@
         };
     }
 
-    function importData(event) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const data = JSON.parse(e.target.result), tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
-            st.clear();
-            data.forEach(item => { delete item.id; st.add(item); });
-            tx.oncomplete = () => { alert("Importado"); render(); refresh(); };
-        };
-        reader.readAsText(event.target.files[0]);
-    }
+function importData(event) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            const tx = db.transaction("trans", "readwrite");
+            const st = tx.objectStore("trans");
+
+            // Limpiamos la base actual para evitar duplicados o conflictos de ID
+            st.clear().onsuccess = () => {
+                data.forEach(item => {
+                    // IMPORTANTE: Ya no borramos item.id
+                    st.put(item); 
+                });
+            };
+
+            tx.oncomplete = () => { 
+                alert("Base de datos restaurada con éxito. Se mantuvo la trazabilidad."); 
+                render(); 
+                refresh(); 
+            };
+            tx.onerror = () => {
+                alert("Error al importar: Posible conflicto de IDs.");
+            };
+        } catch (err) {
+            alert("El archivo no es un JSON válido.");
+        }
+    };
+    reader.readAsText(event.target.files[0]);
+}
 </script>
 </body>
 </html>
