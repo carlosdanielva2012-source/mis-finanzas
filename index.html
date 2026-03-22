@@ -289,20 +289,6 @@
 
     function resetUI() { document.getElementById('f_desc').value=''; document.getElementById('f_amt').value=''; document.getElementById('f_cuotas').value=''; selIds=[]; selNames=[]; }
 
-    function refresh() {
-        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-            let sP = 0, sC = 0;
-            e.target.result.forEach(r => { if(r.acc==='personal') sP += r.amt; else sC += r.amt; });
-            document.getElementById('balDisplay').innerText = `$${(curAcc==='personal'?sP:sC).toFixed(2)}`;
-            document.getElementById('valProj').innerText = `$${(curAcc==='personal'?sP:400+sC).toFixed(2)}`;
-            if(curAcc==='personal') {
-                const hoy = new Date().getDate(), dMax = new Date(new Date().getFullYear(), new Date().getMonth()+1, 0).getDate();
-                const dias = hoy < 14 ? (14-hoy+1) : (dMax-hoy);
-                document.getElementById('valDaily').innerText = `$${(sP>0?sP/dias:0).toFixed(2)}`;
-            }
-        };
-    }
-
 function refresh() {
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
             let sP = 0, sC = 0;
@@ -362,7 +348,48 @@ function refresh() {
             }
         };
     }
-    
+
+    function render() {
+        const l = document.getElementById('listReg'); l.innerHTML = "";
+        const start = document.getElementById('filter_start').value;
+        const end = document.getElementById('filter_end').value;
+
+        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
+            let all = e.target.result.filter(r => r.acc === curAcc);
+            if (start || end) all = all.filter(r => (!start || r.date >= start) && (!end || r.date <= end));
+
+            let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
+            const sorted = all.sort((a,b) => b.ts - a.ts);
+
+            sorted.forEach(r => {
+                let d = document.createElement('div');
+                d.className = `reg-item`;
+                d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
+                
+                let st = r.amt < 0 ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
+                let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
+                
+                d.innerHTML = `
+                    <div class="reg-info">
+                        <small>${r.date} ${st}</small>
+                        <b>${r.cat.replace(/_/g,' ')}</b>
+                        <span>${r.desc}</span>${extra}
+                    </div>
+                    <div style="text-align:right; margin-right:30px">
+                        <div style="font-weight:bold; color:${r.amt>0?'var(--success)':'var(--danger)'}">${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}</div>
+                        <div style="font-size:0.7rem; color:gray">Saldo: $${runningBalance.toFixed(2)}</div>
+                    </div>
+                    <button class="edit-btn">✏️</button>`;
+                
+                d.onclick = () => showDetail(r.id);
+                d.querySelector('.edit-btn').onclick = (ev) => { ev.stopPropagation(); editReg(r.id); };
+
+                runningBalance -= r.amt;
+                l.appendChild(d);
+            });
+        };
+    }
+
     async function showDetail(id) {
         const tx = db.transaction("trans","readonly").objectStore("trans");
         const all = await new Promise(res => { tx.getAll().onsuccess = (ev) => res(ev.target.result); });
