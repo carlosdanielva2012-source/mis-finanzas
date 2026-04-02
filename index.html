@@ -215,74 +215,83 @@
         if (v.includes('pago') || v.includes('tarjeta')) openConciliacion(v);
     }
 
-    function openConciliacion(cat) {
-        const modal = document.getElementById('modalGeneric');
-        const content = document.getElementById('modalContent');
-        selIds = []; tSum = 0; selNames = [];
+function openConciliacion(cat) {
+    const modal = document.getElementById('modalGeneric');
+    const content = document.getElementById('modalContent');
+    selIds = []; tSum = 0; selNames = [];
+    
+    let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
+    let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
+
+    db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
+        const pending = e.target.result.filter(r => {
+            const accMatch = r.acc === targetAcc;
+            const catMatch = targetCats.includes(r.cat);
+            const isDebt = r.amt < 0 && r.status === 'pending';
+            const subMatch = (curAcc === 'personal') ? true : (r.subAcc === curSub);
+            return accMatch && isDebt && catMatch && subMatch;
+        });
+
+        content.innerHTML = `<h3>Liquidar Pendientes</h3>
+            <div id="pList"></div>
+            <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
+                <span>Total a Pagar:</span>
+                <input type="number" id="manualSum" step="0.01" style="width:100px; text-align:right; font-weight:bold; border:1px solid #ccc; border-radius:5px; padding:5px;" value="0.00">
+            </div>
+            <button onclick="applyCon()" class="btn-save" style="margin-top:15px;">Cargar Pago</button>
+            <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray">Cancelar</button>`;
         
-        let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
-        let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
+        const list = document.getElementById('pList');
+        pending.forEach(r => {
+            // Lógica para cuotas o abonos parciales previos
+            let totalDeuda = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
+            let yaPagado = r.abonado || 0;
+            let saldoPendiente = totalDeuda - yaPagado;
 
-        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-            const pending = e.target.result.filter(r => {
-                const accMatch = r.acc === targetAcc;
-                const catMatch = targetCats.includes(r.cat);
-                const isDebt = r.amt < 0 && r.status === 'pending';
-                const subMatch = (curAcc === 'personal') ? true : (r.subAcc === curSub);
-                return accMatch && isDebt && catMatch && subMatch;
-            });
-
-            content.innerHTML = `<h3>Liquidar Pendientes</h3>
-                ${curAcc === 'personal' ? `<p style="font-size:0.75rem; color:var(--primary-p); margin-bottom:10px;">Selecciona consumos de Agrícola o Cuscatlán</p>` : ''}
-                <div id="pList"></div>
-                <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px;">Total: <b id="tS">$0.00</b></div>
-                <button onclick="applyCon()" class="btn-save" style="margin-top:15px;">Cargar Pago</button>
-                <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray">Cancelar</button>`;
-            
-            const list = document.getElementById('pList');
-            pending.forEach(r => {
-                let cuotaAmt = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
-                let venc = (r.acc === 'corriente') ? getDaysToPay(r.date, r.cuotas_pagadas || 0) : null;
-                let d = document.createElement('div');
-                d.style = "padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;";
-                d.innerHTML = `<input type="checkbox" onchange="tick(${r.id},${cuotaAmt},'${r.desc}', '${r.subAcc || 'agricola'}')"> 
-                               <div style="flex:1">
-                                    <b>${r.desc}</b><br>
-                                    <small>${(r.subAcc||'agricola').toUpperCase()} | ${r.cat.split('_')[0]}</small>
-                                    ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Vence en ${venc.days}d</span>` : ''}
-                               </div>
-                               <b>$${cuotaAmt.toFixed(2)}</b>`;
-                list.appendChild(d);
-            });
-            modal.classList.add('show');
-        };
-    }
+            let venc = (r.acc === 'corriente') ? getDaysToPay(r.date, r.cuotas_pagadas || 0) : null;
+            let d = document.createElement('div');
+            d.style = "padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;";
+            d.innerHTML = `<input type="checkbox" onchange="tick(${r.id},${saldoPendiente},'${r.desc}', '${r.subAcc || 'agricola'}')"> 
+                           <div style="flex:1">
+                                <b>${r.desc}</b><br>
+                                <small>${(r.subAcc||'agricola').toUpperCase()} | ${yaPagado > 0 ? `<span style="color:var(--primary-p)">$${yaPagado.toFixed(2)} / $${totalDeuda.toFixed(2)}</span>` : r.cat.split('_')[0]}</small>
+                                ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Vence en ${venc.days}d</span>` : ''}
+                           </div>
+                           <b>$${saldoPendiente.toFixed(2)}</b>`;
+            list.appendChild(d);
+        });
+        modal.classList.add('show');
+    };
+}
 
     let tempSub = 'agricola';
-    function tick(id, m, name, sub) {
-        const i = selIds.indexOf(id);
-        if(i > -1) { 
-            selIds.splice(i,1); 
-            selNames.splice(selNames.indexOf(name),1); 
-            tSum -= m; 
-        } else { 
-            selIds.push(id); 
-            selNames.push(name); 
-            tSum += m; 
-            tempSub = sub; 
-        }
-        document.getElementById('tS').innerText = `$${tSum.toFixed(2)}`;
-    }
 
-    function applyCon() { 
-        document.getElementById('f_amt').value = tSum.toFixed(2);
-        if(selIds.length === 1) document.getElementById('f_desc').value = selNames[0];
-        if(curAcc === 'personal') {
-            curSub = tempSub; 
-            changeSub(tempSub); // Refresca UI del banco seleccionado
-        }
-        closeModal(); 
+function tick(id, m, name, sub) {
+    const i = selIds.indexOf(id);
+    if(i > -1) { 
+        selIds.splice(i,1); 
+        selNames.splice(selNames.indexOf(name),1); 
+        tSum -= m; 
+    } else { 
+        selIds.push(id); 
+        selNames.push(name); 
+        tSum += m; 
+        tempSub = sub; 
     }
+    document.getElementById('manualSum').value = tSum.toFixed(2);
+}
+
+function applyCon() { 
+    const manualAmt = parseFloat(document.getElementById('manualSum').value);
+    document.getElementById('f_amt').value = manualAmt.toFixed(2);
+    tSum = manualAmt; // Actualizamos tSum con lo que el usuario escribió realmente
+    if(selIds.length === 1) document.getElementById('f_desc').value = "Abono: " + selNames[0];
+    if(curAcc === 'personal') {
+        curSub = tempSub; 
+        changeSub(tempSub);
+    }
+    closeModal(); 
+}
 
     function closeModal() { document.getElementById('modalGeneric').classList.remove('show'); }
 
@@ -301,14 +310,33 @@
             st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', subAcc: curSub, status:'paid', ts:Date.now() + 1 });
         }
 
+        let restoPorPagar = am; // El monto que estamos pagando hoy
+
         selIds.forEach(id => {
             st.get(id).onsuccess = (e) => {
                 let res = e.target.result;
                 if(!res) return;
-                if (res.cat === '📅_cuotas') {
-                    res.cuotas_pagadas++;
-                    if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
-                } else { res.status = 'paid'; }
+
+                let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : Math.abs(res.amt);
+                let yaAbonado = res.abonado || 0;
+                let pendiente = deudaTotal - yaAbonado;
+
+                if (restoPorPagar >= pendiente) {
+                    // Pago completo de este cargo
+                    if (res.cat === '📅_cuotas') {
+                        res.cuotas_pagadas++;
+                        res.abonado = 0; // Reinicia abono para la siguiente cuota
+                        if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
+                    } else { 
+                        res.status = 'paid'; 
+                        res.abonado = pendiente; 
+                    }
+                    restoPorPagar -= pendiente;
+                } else {
+                    // Es un abono parcial
+                    res.abonado = yaAbonado + restoPorPagar;
+                    restoPorPagar = 0;
+                }
                 st.put(res);
             };
         });
@@ -378,7 +406,12 @@
             if (start || end) all = all.filter(r => (!start || r.date >= start) && (!end || r.date <= end));
 
             let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
-            const sorted = all.sort((a,b) => b.ts - a.ts);
+            const sorted = all.sort((a,b) => {
+                // Primero ordena por fecha descendente
+                if (b.date !== a.date) return b.date.localeCompare(a.date);
+                // Si la fecha es igual, ordena por el timestamp de creación
+                return b.ts - a.ts;
+            });
 
             sorted.forEach(r => {
                 let d = document.createElement('div');
