@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finanzas Daniel Pro - v3.4</title>
+    <title>Finanzas Daniel Pro - v4.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
             --primary-p: #2563eb; 
@@ -31,8 +33,8 @@
         .acc-btn { flex: 1; padding: 12px; border: none; background: transparent; color: #64748b; font-weight: 600; cursor: pointer; border-radius: 10px; }
         .acc-btn.active { background: white; color: var(--text-dark); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 
-        .sub-selector { display: flex; gap: 5px; margin-bottom: 20px; }
-        .sub-btn { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-size: 0.8rem; cursor: pointer; color: #64748b; }
+        .sub-selector { display: flex; gap: 5px; margin-bottom: 20px; align-items: center; }
+        .sub-btn { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: white; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: #64748b; }
         .sub-btn.active { background: var(--text-dark); color: white; border-color: var(--text-dark); }
 
         .form-card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
@@ -56,7 +58,7 @@
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; visibility: hidden; opacity: 0; transition: 0.2s; }
         .modal-overlay.show { visibility: visible; opacity: 1; }
-        .modal-body { background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 20px; max-height: 80vh; overflow-y: auto; }
+        .modal-body { background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 20px; max-height: 85vh; overflow-y: auto; }
         .hidden { display: none; }
         
         .status-pill { font-size: 0.7rem; padding: 2px 6px; border-radius: 6px; margin-left: 5px; font-weight: bold; }
@@ -74,11 +76,13 @@
             <span id="labelAcc">Cuenta Personal</span>
             <h1 id="balDisplay">$0.00</h1>
             <div id="boxDaily" class="pill">Disponible/día: <b id="valDaily">$0.00</b></div><br>
-            <div class="pill">Proyectado: <b id="valProj">$0.00</b></div>
+            <div class="pill" id="projLabelContainer">Proyectado: <b id="valProj">$0.00</b></div>
         </div>
         
         <div id="panelC" class="info-panel hidden">
-            <div>🗓️ Corte<br><b>Día 9</b></div><div>💵 Pago<br><b>Día 6</b></div><div>💳 Límite<br><b id="valLimit">$400.00</b></div>
+            <div>🗓️ Corte<br><b>Día <span id="valCutDay">9</span></b></div>
+            <div>💵 Pago<br><b>Día <span id="valPayDay">6</span></b></div>
+            <div>💳 Límite<br><b id="valLimit">$400.00</b></div>
         </div>
 
         <div class="acc-selector">
@@ -89,6 +93,7 @@
         <div id="subAccContainer" class="sub-selector hidden">
             <button onclick="changeSub('agricola')" id="btnSubAgri" class="sub-btn active">Agrícola</button>
             <button onclick="changeSub('cuscatlan')" id="btnSubCusca" class="sub-btn">Cuscatlán</button>
+            <button onclick="openSettings()" style="padding:10px 14px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center;" title="Configurar fechas de corte y pago">⚙️</button>
         </div>
 
         <div class="form-card">
@@ -96,23 +101,24 @@
             <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="f_desc" class="input-ctrl" placeholder="Descripción"></div>
             <div class="form-group"><label class="form-label">Categoría</label><select id="f_cat" class="input-ctrl" onchange="handleCat(this.value)"></select></div>
             <div id="grpCuotas" class="form-group hidden"><label class="form-label">Total de cuotas</label><input type="number" id="f_cuotas" class="input-ctrl" placeholder="Ej: 3"></div>
-            <div class="form-group"><label class="form-label">Monto</label><input type="number" id="f_amt" class="input-ctrl" placeholder="0.00" step="0.01"></div>
+            <div class="form-group"><label class="form-label">Monto ($)</label><input type="number" id="f_amt" class="input-ctrl" placeholder="0.00" step="0.01"></div>
             <button class="btn-save" id="saveBtn" onclick="doSave()">Guardar Registro</button>
         </div>
     </div>
 
     <div id="tab-registros" class="tab-content">
-        <h2 style="color:var(--primary-p); margin-bottom:15px;">Historial</h2>
+        <h2 style="color:var(--primary-p); margin-bottom:15px;" id="titleHistorial">Historial</h2>
         <div style="background: white; padding: 15px; border-radius: 15px; margin-bottom: 15px;">
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <button onclick="exportData()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background:white;">📤 Exportar</button>
-                <button onclick="document.getElementById('fileInput').click()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background:white;">📥 Importar</button>
+                <button onclick="exportData()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background:white; font-weight:600; cursor:pointer;">📤 Exportar JSON</button>
+                <button onclick="document.getElementById('fileInput').click()" style="flex:1; padding: 8px; border-radius: 8px; border: 1px solid #ccc; background:white; font-weight:600; cursor:pointer;">📥 Importar JSON</button>
                 <input type="file" id="fileInput" class="hidden" accept=".json" onchange="importData(event)">
             </div>
+            <button onclick="exportPDF()" style="width:100%; padding: 12px; border-radius: 8px; border: none; background: #1e293b; color: white; font-weight: bold; margin-bottom: 10px; cursor: pointer; font-size: 0.95rem; display:flex; align-items:center; justify-content:center; gap:8px;">📊 Exportar Auditoría PDF</button>
             <div style="display: flex; gap: 8px;">
                 <input type="date" id="filter_start" class="input-ctrl" style="padding: 8px;">
                 <input type="date" id="filter_end" class="input-ctrl" style="padding: 8px;">
-                <button onclick="render()" style="background: var(--primary-p); color: white; border: none; padding: 8px 15px; border-radius: 8px;">🔍</button>
+                <button onclick="render()" style="background: var(--primary-p); color: white; border: none; padding: 8px 15px; border-radius: 8px; cursor:pointer; font-weight:bold;">🔍 Filtrar</button>
             </div>
         </div>
         <div id="listReg"></div>
@@ -129,9 +135,14 @@
 </div>
 
 <script>
-    let db, curAcc = 'personal', curSub = 'agricola', selIds = [], selNames = [], tSum = 0;
+    let db, curAcc = 'personal', curSub = 'agricola', selIds = [], selNames = [], selAmounts = {}, tSum = 0;
     const incomeRules = ['quincena', 'ahorro', '💳_pago', '🤑_pago_prestamo'];
     const limits = { agricola: 400, cuscatlan: 810 };
+
+    // --- Configuración persistente de fechas por subcuenta ---
+    let accountSettings = JSON.parse(localStorage.getItem('finDanielSettings') || 'null') || 
+        { agricola: { cutDay: 9, payDay: 6 }, cuscatlan: { cutDay: 9, payDay: 6 } };
+    function saveSettings() { localStorage.setItem('finDanielSettings', JSON.stringify(accountSettings)); }
 
     const request = indexedDB.open("FinanzasDanielDB", 2);
     request.onsuccess = (e) => { db = e.target.result; refresh(); init(); };
@@ -142,17 +153,19 @@
 
     function init() { document.getElementById('f_date').valueAsDate = new Date(); updateCats(); }
 
-    // --- NUEVA LÓGICA DE FECHAS ---
-    function getDaysToPay(purchaseDateStr, cuotasPagadas = 0) {
+    // --- LÓGICA DE FECHAS CON DÍAS CONFIGURABLES ---
+    function getDaysToPay(purchaseDateStr, cuotasPagadas = 0, subAcc = null) {
+        const sub = subAcc || curSub || 'agricola';
+        const cfg = accountSettings[sub] || { cutDay: 9, payDay: 6 };
         const pDate = new Date(purchaseDateStr + 'T00:00:00');
         const today = new Date(); today.setHours(0,0,0,0);
-        let cutDate = new Date(pDate.getFullYear(), pDate.getMonth(), 9);
+        let cutDate = new Date(pDate.getFullYear(), pDate.getMonth(), cfg.cutDay);
         let payDate;
 
         if (pDate <= cutDate) {
-            payDate = new Date(pDate.getFullYear(), pDate.getMonth() + 1, 6);
+            payDate = new Date(pDate.getFullYear(), pDate.getMonth() + 1, cfg.payDay);
         } else {
-            payDate = new Date(pDate.getFullYear(), pDate.getMonth() + 2, 6);
+            payDate = new Date(pDate.getFullYear(), pDate.getMonth() + 2, cfg.payDay);
         }
 
         if (cuotasPagadas > 0) {
@@ -181,6 +194,12 @@
         document.getElementById('subAccContainer').classList.toggle('hidden', !isC);
         document.getElementById('btnP').classList.toggle('active', a==='personal');
         document.getElementById('btnC').classList.toggle('active', isC);
+        
+        const titleHistorial = document.getElementById('titleHistorial');
+        if(titleHistorial) {
+            titleHistorial.style.color = isC ? '#b45309' : 'var(--primary-p)';
+        }
+        
         updateUIColors();
         updateCats(); 
         refresh();
@@ -191,14 +210,48 @@
         document.getElementById('btnSubAgri').classList.toggle('active', s==='agricola');
         document.getElementById('btnSubCusca').classList.toggle('active', s==='cuscatlan');
         document.getElementById('valLimit').innerText = `$${limits[s].toFixed(2)}`;
+        const cfg = accountSettings[s] || { cutDay: 9, payDay: 6 };
+        document.getElementById('valCutDay').innerText = cfg.cutDay;
+        document.getElementById('valPayDay').innerText = cfg.payDay;
         updateUIColors();
         refresh();
+    }
+
+    function openSettings() {
+        const cfg = accountSettings[curSub] || { cutDay: 9, payDay: 6 };
+        const content = document.getElementById('modalContent');
+        content.innerHTML = `
+            <h3>⚙️ Configurar Fechas - ${curSub.toUpperCase()}</h3>
+            <p style="color:#64748b; font-size:0.85rem;">Configura los días de corte y pago para la cuenta corriente <b>${curSub}</b>.</p>
+            <div class="form-group">
+                <label class="form-label">Día de Corte (1-31)</label>
+                <input type="number" id="cfg_cut" class="input-ctrl" min="1" max="31" value="${cfg.cutDay}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Día de Pago (1-31)</label>
+                <input type="number" id="cfg_pay" class="input-ctrl" min="1" max="31" value="${cfg.payDay}">
+            </div>
+            <div style="background:#fef9c3; border:1px solid #fde047; padding:10px; border-radius:8px; font-size:0.8rem; color:#854d0e; margin-bottom:15px;">
+                💡 Ej: Corte día 9 → compras antes del 9 pagan el día 6 del mes siguiente. Compras después del 9 pagan el día 6 en dos meses.
+            </div>
+            <button onclick="applySettings()" class="btn-save" style="background:var(--text-dark); color:white;">Guardar Configuración</button>
+            <button onclick="closeModal()" style="width:100%;border:none;margin-top:10px;color:gray;background:none;cursor:pointer;font-weight:600;">Cancelar</button>`;
+        document.getElementById('modalGeneric').classList.add('show');
+    }
+
+    function applySettings() {
+        const cutDay = parseInt(document.getElementById('cfg_cut').value) || 9;
+        const payDay = parseInt(document.getElementById('cfg_pay').value) || 6;
+        accountSettings[curSub] = { cutDay, payDay };
+        saveSettings();
+        changeSub(curSub); // Refresh display
+        closeModal();
     }
 
     function updateUIColors() {
         const isC = curAcc === 'corriente';
         document.getElementById('labelAcc').innerText = isC ? `Cuenta Corriente (${curSub.toUpperCase()})` : "Cuenta Personal";
-        document.getElementById('saveBtn').style.background = isC ? 'var(--primary-c)' : 'var(--primary-p)';
+        document.getElementById('saveBtn').style.background = isC ? '#eab308' : 'var(--primary-p)';
         document.getElementById('saveBtn').style.color = isC ? 'var(--text-dark)' : 'white';
     }
 
@@ -215,127 +268,170 @@
         if (v.includes('pago') || v.includes('tarjeta')) openConciliacion(v);
     }
 
-function openConciliacion(cat) {
-    const modal = document.getElementById('modalGeneric');
-    const content = document.getElementById('modalContent');
-    selIds = []; tSum = 0; selNames = [];
-    
-    let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
-    let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
-
-    db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-        const pending = e.target.result.filter(r => {
-            const accMatch = r.acc === targetAcc;
-            const catMatch = targetCats.includes(r.cat);
-            const isDebt = r.amt < 0 && r.status === 'pending';
-            const subMatch = (curAcc === 'personal') ? true : (r.subAcc === curSub);
-            return accMatch && isDebt && catMatch && subMatch;
-        });
-
-        content.innerHTML = `<h3>Liquidar Pendientes</h3>
-            <div id="pList"></div>
-            <div style="background:#f8fafc; padding:15px; border-radius:10px; margin-top:15px; display:flex; justify-content:space-between; align-items:center;">
-                <span>Total a Pagar:</span>
-                <input type="number" id="manualSum" step="0.01" style="width:100px; text-align:right; font-weight:bold; border:1px solid #ccc; border-radius:5px; padding:5px;" value="0.00">
-            </div>
-            <button onclick="applyCon()" class="btn-save" style="margin-top:15px;">Cargar Pago</button>
-            <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray">Cancelar</button>`;
+    function openConciliacion(cat) {
+        const modal = document.getElementById('modalGeneric');
+        const content = document.getElementById('modalContent');
+        selIds = []; tSum = 0; selNames = []; selAmounts = {};
         
-        const list = document.getElementById('pList');
-        pending.forEach(r => {
-            // Lógica para cuotas o abonos parciales previos
-            let totalDeuda = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
-            let yaPagado = r.abonado || 0;
-            let saldoPendiente = totalDeuda - yaPagado;
+        let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
+        let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
 
-            let venc = (r.acc === 'corriente') ? getDaysToPay(r.date, r.cuotas_pagadas || 0) : null;
-            let d = document.createElement('div');
-            d.style = "padding:10px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;";
-            d.innerHTML = `<input type="checkbox" onchange="tick(${r.id},${saldoPendiente},'${r.desc}', '${r.subAcc || 'agricola'}')"> 
-                           <div style="flex:1">
-                                <b>${r.desc}</b><br>
-                                <small>${(r.subAcc||'agricola').toUpperCase()} | ${yaPagado > 0 ? `<span style="color:var(--primary-p)">$${yaPagado.toFixed(2)} / $${totalDeuda.toFixed(2)}</span>` : r.cat.split('_')[0]}</small>
-                                ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Vence en ${venc.days}d</span>` : ''}
-                           </div>
-                           <b>$${saldoPendiente.toFixed(2)}</b>`;
-            list.appendChild(d);
-        });
-        modal.classList.add('show');
-    };
-}
+        db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
+            const pending = e.target.result.filter(r => {
+                const accMatch = r.acc === targetAcc;
+                const catMatch = targetCats.includes(r.cat);
+                const isDebt = r.amt < 0 && r.status === 'pending';
+                const subMatch = (curAcc === 'personal') ? true : (r.subAcc === curSub);
+                return accMatch && isDebt && catMatch && subMatch;
+            });
+
+            content.innerHTML = `
+                <h3>Liquidar Items Pendientes</h3>
+                <p style="font-size:0.85rem;color:#64748b;margin-top:-5px;">Selecciona los ítems y escribe el monto exacto que vas a abonar a cada uno por separado.</p>
+                <div id="pList" style="max-height:280px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:10px; padding:5px;"></div>
+                <div style="background:#f8fafc; padding:12px 15px; border-radius:10px; margin-top:12px; display:flex; justify-content:space-between; align-items:center; border:1px solid #e2e8f0;">
+                    <span style="font-weight:600;">Suma Total a Cargar:</span>
+                    <span id="manualSum" style="font-size:1.3rem; font-weight:bold; color:var(--primary-p);">$0.00</span>
+                </div>
+                <button onclick="applyCon()" class="btn-save" style="margin-top:15px; background:var(--text-dark);">Cargar Monto Combinado</button>
+                <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray; background:none; cursor:pointer; font-weight:600;">Cancelar</button>`;
+            
+            const list = document.getElementById('pList');
+            if (pending.length === 0) {
+                list.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px;">Sin pendientes para liquidar.</p>';
+            }
+
+            pending.forEach(r => {
+                let totalDeuda = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
+                let yaPagado = r.abonado || 0;
+                let saldoPendiente = totalDeuda - yaPagado;
+                let venc = (r.acc === 'corriente') ? getDaysToPay(r.date, r.cuotas_pagadas || 0, r.subAcc) : null;
+                let cleanCat = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim();
+
+                let d = document.createElement('div');
+                d.style = "padding:10px; border-bottom:1px solid #f1f5f9;";
+                d.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" id="chk_${r.id}" onchange="tick(${r.id},'${r.desc.replace(/'/g,"\'")}','${r.subAcc||'agricola'}')">
+                        <div style="flex:1;">
+                            <b style="font-size:0.9rem;">${r.desc}</b>
+                            <br><small style="color:#64748b;">${(r.subAcc||'agricola').toUpperCase()} | ${cleanCat}${yaPagado > 0 ? ` | abonado: $${yaPagado.toFixed(2)}` : ''}</small>
+                            ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Vence en ${venc.days}d — ${venc.label}</span>` : ''}
+                        </div>
+                        <span style="font-size:0.75rem;color:#94a3b8;text-align:right;">máx<br><b style="color:var(--text-dark); font-size:0.85rem;">$${saldoPendiente.toFixed(2)}</b></span>
+                    </div>
+                    <div id="row_${r.id}" style="display:none; margin-top:8px; padding:8px; background:#f8fafc; border-radius:8px; align-items:center; gap:8px;">
+                        <label style="font-size:0.8rem;color:#64748b;flex:1;font-weight:600;">Monto a abonar:</label>
+                        <input type="number" id="amt_${r.id}" class="input-ctrl" 
+                               style="width:110px; padding:6px; font-size:0.95rem; font-weight:bold; text-align:right;"
+                               step="0.01" min="0.01" max="${saldoPendiente.toFixed(2)}" 
+                               value="${saldoPendiente.toFixed(2)}"
+                               oninput="updateItemAmt(${r.id})">
+                    </div>`;
+                list.appendChild(d);
+            });
+            modal.classList.add('show');
+        };
+    }
 
     let tempSub = 'agricola';
 
-function tick(id, m, name, sub) {
-    const i = selIds.indexOf(id);
-    if(i > -1) { 
-        selIds.splice(i,1); 
-        selNames.splice(selNames.indexOf(name),1); 
-        tSum -= m; 
-    } else { 
-        selIds.push(id); 
-        selNames.push(name); 
-        tSum += m; 
-        tempSub = sub; 
+    function tick(id, name, sub) {
+        const chk = document.getElementById(`chk_${id}`);
+        const row = document.getElementById(`row_${id}`);
+        const amtInput = document.getElementById(`amt_${id}`);
+        const idx = selIds.indexOf(id);
+        
+        if (chk.checked) {
+            if (idx === -1) { selIds.push(id); selNames.push(name); }
+            selAmounts[id] = parseFloat(amtInput.value) || 0;
+            row.style.display = 'flex';
+            tempSub = sub;
+        } else {
+            if (idx > -1) { selIds.splice(idx,1); selNames.splice(selNames.indexOf(name),1); }
+            delete selAmounts[id];
+            row.style.display = 'none';
+        }
+        recalcTotal();
     }
-    document.getElementById('manualSum').value = tSum.toFixed(2);
-}
 
-function applyCon() { 
-    const manualAmt = parseFloat(document.getElementById('manualSum').value);
-    document.getElementById('f_amt').value = manualAmt.toFixed(2);
-    tSum = manualAmt; // Actualizamos tSum con lo que el usuario escribió realmente
-    if(selIds.length === 1) document.getElementById('f_desc').value = "Abono: " + selNames[0];
-    if(curAcc === 'personal') {
-        curSub = tempSub; 
-        changeSub(tempSub);
+    function updateItemAmt(id) {
+        if (selIds.includes(id)) {
+            const amtInput = document.getElementById(`amt_${id}`);
+            selAmounts[id] = parseFloat(amtInput.value) || 0;
+            recalcTotal();
+        }
     }
-    closeModal(); 
-}
+
+    function recalcTotal() {
+        tSum = Object.values(selAmounts).reduce((s,v) => s + v, 0);
+        const el = document.getElementById('manualSum');
+        if (el) el.textContent = `$${tSum.toFixed(2)}`;
+    }
+
+    function applyCon() { 
+        if (selIds.length === 0) { alert("Selecciona al menos un ítem."); return; }
+        document.getElementById('f_amt').value = tSum.toFixed(2);
+        if(selIds.length === 1) document.getElementById('f_desc').value = "Abono: " + selNames[0];
+        else document.getElementById('f_desc').value = `Abono: ${selIds.length} items`;
+        if(curAcc === 'personal') { curSub = tempSub; changeSub(tempSub); }
+        closeModal(); 
+    }
 
     function closeModal() { document.getElementById('modalGeneric').classList.remove('show'); }
 
     function doSave() {
         const d = document.getElementById('f_date').value, de = document.getElementById('f_desc').value,
               ca = document.getElementById('f_cat').value, am = parseFloat(document.getElementById('f_amt').value);
-        if(!de || isNaN(am)) return alert("Datos incompletos");
+        if(!d || !de || isNaN(am)) return alert("Datos incompletos");
 
         const tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
         let finalAmt = (incomeRules.some(r => ca.includes(r)) && ca !== '💳_pago_tarjeta') ? am : -am;
 
-        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status:'pending', kids:[...selIds], ts:Date.now() };
+        // REGLA DE ESTADOS SOLICITADA POR EL USUARIO:
+        // Cuenta corriente -> pending. 
+        // Cuenta personal -> pagado SIEMPRE, excepto cuando la categoría es Préstamo (🏦_prestamo), que queda como pending.
+        let initialStatus;
+        if (finalAmt > 0) {
+            initialStatus = 'paid';
+        } else if (curAcc === 'corriente') {
+            initialStatus = 'pending';
+        } else if (curAcc === 'personal' && ca === '🏦_prestamo') {
+            initialStatus = 'pending';
+        } else {
+            initialStatus = 'paid';
+        }
+
+        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status: initialStatus, kids:[...selIds], ts:Date.now() };
         if (ca === '📅_cuotas') { entry.total_cuotas = parseInt(document.getElementById('f_cuotas').value) || 1; entry.cuotas_pagadas = 0; }
 
         if (curAcc === 'personal' && ca === '💳_pago_tarjeta') {
             st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', subAcc: curSub, status:'paid', ts:Date.now() + 1 });
         }
 
-        let restoPorPagar = am; // El monto que estamos pagando hoy
-
+        // Aplicar abonos individuales personalizados POR ÍTEM seleccionados en el modal de liquidación
         selIds.forEach(id => {
+            const montoAplicar = selAmounts[id] || 0;
+            if (montoAplicar <= 0) return;
             st.get(id).onsuccess = (e) => {
                 let res = e.target.result;
                 if(!res) return;
-
                 let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : Math.abs(res.amt);
                 let yaAbonado = res.abonado || 0;
                 let pendiente = deudaTotal - yaAbonado;
 
-                if (restoPorPagar >= pendiente) {
-                    // Pago completo de este cargo
+                if (montoAplicar >= pendiente) {
                     if (res.cat === '📅_cuotas') {
                         res.cuotas_pagadas++;
-                        res.abonado = 0; // Reinicia abono para la siguiente cuota
+                        res.abonado = 0;
                         if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
                     } else { 
                         res.status = 'paid'; 
-                        res.abonado = pendiente; 
+                        res.abonado = deudaTotal;
                     }
-                    restoPorPagar -= pendiente;
                 } else {
-                    // Es un abono parcial
-                    res.abonado = yaAbonado + restoPorPagar;
-                    restoPorPagar = 0;
+                    res.abonado = yaAbonado + montoAplicar;
+                    // Si se abonó pero no cubre todo el saldo pendiente, sigue estando pending.
                 }
                 st.put(res);
             };
@@ -345,7 +441,7 @@ function applyCon() {
             resetUI(); 
             refresh(); 
             if(curAcc === 'corriente') render();
-            updateCats(); // Forzar refresh de la lista para limpiar selección
+            updateCats();
         };
     }
 
@@ -353,7 +449,7 @@ function applyCon() {
         document.getElementById('f_desc').value=''; 
         document.getElementById('f_amt').value=''; 
         document.getElementById('f_cuotas').value=''; 
-        selIds=[]; selNames=[]; tSum=0;
+        selIds=[]; selNames=[]; selAmounts={}; tSum=0;
     }
 
     function refresh() {
@@ -375,20 +471,20 @@ function applyCon() {
             document.getElementById('balDisplay').innerText = `$${(curAcc==='personal'?sP:sC).toFixed(2)}`;
             
             const valProj = document.getElementById('valProj');
-            const labelProj = valProj.parentElement;
+            const projLabelContainer = document.getElementById('projLabelContainer');
 
             if(curAcc==='personal') {
                 const diaActual = hoy.getDate(), dMax = new Date(hoy.getFullYear(), hoy.getMonth()+1, 0).getDate();
                 const diasRestantes = diaActual < 14 ? (14 - diaActual + 1) : (dMax - diaActual);
                 const disponibleDiario = sP > 0 ? sP / diasRestantes : 0;
                 document.getElementById('valDaily').innerText = `$${disponibleDiario.toFixed(2)}`;
-                labelProj.firstChild.textContent = "Promedio (7Day): "; 
-                valProj.innerText = `$${promedioGasto.toFixed(2)}`;
-                valProj.style.color = (promedioGasto > disponibleDiario) ? "#ff4444" : "#10b981";
+                if(projLabelContainer) projLabelContainer.innerHTML = `Promedio (7Días): <b id="valProj">$${promedioGasto.toFixed(2)}</b>`;
+                const newValProj = document.getElementById('valProj');
+                if(newValProj) newValProj.style.color = (promedioGasto > disponibleDiario) ? "#ef4444" : "#10b981";
             } else {
-                labelProj.firstChild.textContent = "Proyectado: ";
-                valProj.innerText = `$${(limits[curSub] + sC).toFixed(2)}`;
-                valProj.style.color = "inherit";
+                if(projLabelContainer) projLabelContainer.innerHTML = `Proyectado: <b id="valProj">$${(limits[curSub] + sC).toFixed(2)}</b>`;
+                const newValProj = document.getElementById('valProj');
+                if(newValProj) newValProj.style.color = "white";
             }
         };
     }
@@ -407,9 +503,7 @@ function applyCon() {
 
             let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
             const sorted = all.sort((a,b) => {
-                // Primero ordena por fecha descendente
                 if (b.date !== a.date) return b.date.localeCompare(a.date);
-                // Si la fecha es igual, ordena por el timestamp de creación
                 return b.ts - a.ts;
             });
 
@@ -418,24 +512,26 @@ function applyCon() {
                 d.className = `reg-item`;
                 d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
                 
-                let st = r.amt < 0 ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
-                let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
-                let bName = r.acc === 'corriente' ? `[${(r.subAcc||'AGRI').toUpperCase()}] ` : '';
+                // Mostrar estatus pendiente o pagado según corresponda
+                let st = r.amt < 0 ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅ Pagado</span>' : '<span class="status-pill status-pending">⏳ Pendiente</span>') : '';
+                let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas || 0}/${r.total_cuotas}</small>` : '';
+                let bName = r.acc === 'corriente' ? `[${(r.subAcc||'AGRI').toUpperCase()}] ` : '[PERSONAL] ';
 
-                let venc = (r.acc === 'corriente' && r.status === 'pending' && r.amt < 0) ? getDaysToPay(r.date, r.cuotas_pagadas || 0) : null;
+                let venc = (r.acc === 'corriente' && r.status === 'pending' && r.amt < 0) ? getDaysToPay(r.date, r.cuotas_pagadas || 0, r.subAcc) : null;
+                let cleanCat = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').toUpperCase();
 
                 d.innerHTML = `
-                    <div class="reg-info">
+                    <div class="reg-info" style="max-width: 70%;">
                         <small>${r.date} ${st}</small>
-                        <b>${bName}${r.cat.replace(/_/g,' ')}</b>
+                        <b>${bName}${cleanCat}</b>
                         <span>${r.desc}</span>${extra}
                         ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Prox: ${venc.label} (${venc.days}d)</span>` : ''}
                     </div>
-                    <div style="text-align:right; margin-right:30px">
-                        <div style="font-weight:bold; color:${r.amt>0?'var(--success)':'var(--danger)'}">${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}</div>
-                        <div style="font-size:0.7rem; color:gray">Saldo: $${runningBalance.toFixed(2)}</div>
+                    <div style="text-align:right; flex-grow:1; padding-right:10px;">
+                        <div style="font-weight:bold; font-size:1.05rem; color:${r.amt>0?'var(--success)':'var(--danger)'}">${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}</div>
+                        <div style="font-size:0.75rem; color:gray">Saldo: $${runningBalance.toFixed(2)}</div>
                     </div>
-                    <button class="edit-btn">✏️</button>`;
+                    <button class="edit-btn" style="align-self:center;">✏️</button>`;
                 
                 d.onclick = () => showDetail(r.id);
                 d.querySelector('.edit-btn').onclick = (ev) => { ev.stopPropagation(); editReg(r.id); };
@@ -452,17 +548,24 @@ function applyCon() {
         if(!r) return;
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
-        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()} (${(r.subAcc||'agricola').toUpperCase()})</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
+        let cleanCat = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim();
+        let html = `<h3>Detalles del Registro</h3>
+                    <p><b>Cuenta:</b> ${r.acc.toUpperCase()} ${(r.acc==='corriente'?`(${r.subAcc.toUpperCase()})` : '')}</p>
+                    <p><b>Categoría:</b> ${cleanCat}</p>
+                    <p><b>Descripción:</b> ${r.desc}</p>
+                    <p><b>Monto:</b> $${Math.abs(r.amt).toFixed(2)}</p>
+                    <p><b>Estado:</b> ${r.status === 'paid' ? '✅ Pagado / Liquidado' : '⏳ Pendiente'}</p><hr>`;
+        
         const parent = all.find(p => p.kids && p.kids.includes(Number(id)));
-        if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por:</small><br><b>${parent.desc}</b></div>`;
+        if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por el pago:</small><br><b>${parent.desc}</b></div>`;
         if(r.kids && r.kids.length > 0) {
-            html += `<h4>Liquidó a:</h4>`;
+            html += `<h4>Ítems vinculados liquidados:</h4>`;
             r.kids.forEach(kId => {
                 const kid = all.find(k => k.id === kId);
-                if(kid) html += `<div style="font-size:0.8rem; border-bottom:1px solid #eee; padding:4px 0;">${kid.desc} ($${(Math.abs(kid.amt)/(kid.total_cuotas||1)).toFixed(2)})</div>`;
+                if(kid) html += `<div style="font-size:0.85rem; border-bottom:1px solid #eee; padding:5px 0;">• ${kid.desc} ($${(Math.abs(kid.amt)/(kid.total_cuotas||1)).toFixed(2)})</div>`;
             });
         }
-        html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar</button>`;
+        html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar Ventana</button>`;
         content.innerHTML = html;
         modal.classList.add('show');
     }
@@ -471,12 +574,12 @@ function applyCon() {
         db.transaction("trans","readonly").objectStore("trans").get(id).onsuccess = (e) => {
             const r = e.target.result;
             const content = document.getElementById('modalContent');
-            content.innerHTML = `<h3>Editar</h3>
-                <div class="form-group"><label>Descripción</label><input type="text" id="ed_desc" class="input-ctrl" value="${r.desc}"></div>
-                <div class="form-group"><label>Monto</label><input type="number" id="ed_amt" class="input-ctrl" value="${Math.abs(r.amt)}"></div>
-                <button onclick="saveEdit(${r.id})" class="btn-save">Guardar</button>
-                <button onclick="deleteReg(${r.id})" style="width:100%; color:red; margin-top:10px; background:none; border:none;">🗑️ Eliminar</button>
-                <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; background:none;">Cancelar</button>`;
+            content.innerHTML = `<h3>Editar Registro</h3>
+                <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="ed_desc" class="input-ctrl" value="${r.desc}"></div>
+                <div class="form-group"><label class="form-label">Monto ($)</label><input type="number" id="ed_amt" class="input-ctrl" value="${Math.abs(r.amt)}"></div>
+                <button onclick="saveEdit(${r.id})" class="btn-save">Guardar Cambios</button>
+                <button onclick="deleteReg(${r.id})" style="width:100%; color:red; margin-top:15px; background:none; border:none; font-weight:bold; cursor:pointer;">🗑️ Eliminar Registro</button>
+                <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; background:none; color:gray; cursor:pointer;">Cancelar</button>`;
             document.getElementById('modalGeneric').classList.add('show');
         };
     }
@@ -494,7 +597,7 @@ function applyCon() {
     }
 
     function deleteReg(id) {
-        if(!confirm("¿Borrar registro?")) return;
+        if(!confirm("¿Estás seguro de que deseas borrar este registro de forma permanente?")) return;
         const tx = db.transaction("trans", "readwrite");
         tx.objectStore("trans").delete(id).oncomplete = () => { closeModal(); render(); refresh(); };
     }
@@ -502,8 +605,275 @@ function applyCon() {
     function exportData() {
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
             const blob = new Blob([JSON.stringify(e.target.result, null, 2)], { type: "application/json" });
-            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_finanzas_${new Date().toISOString().split('T')[0]}.json`; a.click();
         };
+    }
+
+    async function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        const start = document.getElementById('filter_start').value;
+        const end   = document.getElementById('filter_end').value;
+
+        // ---- Obtener TODOS los datos de la base ----
+        const allTrans = await new Promise(res => {
+            db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = e => res(e.target.result);
+        });
+
+        // 1. Filtrado para la vista activa del reporte principal
+        let dataReporte = allTrans.filter(r =>
+            r.acc === curAcc &&
+            (curAcc === 'personal' ? true : (r.subAcc === curSub || (!r.subAcc && curSub === 'agricola')))
+        );
+        if (start || end) dataReporte = dataReporte.filter(r => (!start || r.date >= start) && (!end || r.date <= end));
+        const sortedReporte = [...dataReporte].sort((a,b) => a.date.localeCompare(b.date) || a.ts - b.ts);
+
+        // ---- Métricas del reporte activo ----
+        const ingresos  = sortedReporte.filter(r => r.amt > 0).reduce((s,r) => s + r.amt, 0);
+        const gastos    = sortedReporte.filter(r => r.amt < 0).reduce((s,r) => s + Math.abs(r.amt), 0);
+        const neto      = ingresos - gastos;
+
+        // Categorías agrupadas limpiando mojibake (quitando emojis problemáticos para jsPDF)
+        const catMap = {};
+        sortedReporte.forEach(r => {
+            let keyClean = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim().toUpperCase();
+            if(!keyClean) keyClean = "GENERAL";
+            if (!catMap[keyClean]) catMap[keyClean] = { ing: 0, gas: 0, count: 0 };
+            if (r.amt > 0) catMap[keyClean].ing += r.amt; else catMap[keyClean].gas += Math.abs(r.amt);
+            catMap[keyClean].count++;
+        });
+
+        // ---- Colores base ----
+        const AZUL    = [37, 99, 235];
+        const OSCURO  = [30, 41, 59];
+        const VERDE   = [16, 185, 129];
+        const ROJO    = [239, 68, 68];
+        const GRIS_BG = [240, 243, 247];
+        const BLANCO  = [255, 255, 255];
+
+        const pageW = 210, mar = 14;
+        let y = 0;
+
+        // ======== ENCABEZADO SOLIDO ========
+        doc.setFillColor(...AZUL);
+        doc.rect(0, 0, pageW, 42, 'F');
+
+        doc.setTextColor(255,255,255);
+        doc.setFont('helvetica','bold');
+        doc.setFontSize(22);
+        doc.text('Auditoría Financiera Integral', mar, 16);
+
+        doc.setFontSize(10);
+        doc.setFont('helvetica','normal');
+        const accLabel = curAcc === 'personal' ? 'Cuenta Seleccionada: Personal' : `Cuenta Seleccionada: Corriente (${curSub.toUpperCase()})`;
+        doc.text(accLabel, mar, 24);
+
+        const periodoLabel = (start || end) ? `Periodo de Consulta: ${start || '---'} hasta ${end || '---'}` : 'Periodo de Consulta: Historial Completo';
+        doc.text(periodoLabel, mar, 30);
+
+        const generado = new Date().toLocaleString('es-SV', { dateStyle:'long', timeStyle:'short' });
+        doc.text(`Fecha y Hora de Emisión: ${generado}`, mar, 36);
+
+        doc.setFont('helvetica','bold');
+        doc.text('Finanzas Daniel Pro', pageW - mar, 16, { align:'right' });
+
+        y = 50;
+
+        // ======== TARJETAS RESUMEN DE LA CUENTA ACTUAL ========
+        const cardW = (pageW - mar*2 - 8) / 3;
+        const cards = [
+            { label:'INGRESOS TOTALES', value: ingresos, color: VERDE },
+            { label:'GASTOS TOTALES',   value: gastos,   color: ROJO  },
+            { label:'BALANCE NETO', value: neto,   color: neto >= 0 ? VERDE : ROJO },
+        ];
+        cards.forEach((c, i) => {
+            const x = mar + i * (cardW + 4);
+            doc.setFillColor(...GRIS_BG);
+            doc.roundedRect(x, y, cardW, 22, 3, 3, 'F');
+            doc.setDrawColor(...c.color);
+            doc.setLineWidth(0.8);
+            doc.line(x + 2, y, x + 2, y + 22);
+            doc.setTextColor(...OSCURO);
+            doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+            doc.text(c.label, x + 5, y + 7);
+            doc.setFont('helvetica','bold'); doc.setFontSize(11);
+            doc.setTextColor(...c.color);
+            const sign = c.label === 'GASTOS TOTALES' ? '-' : (c.label === 'BALANCE NETO' && neto < 0 ? '-' : '+');
+            doc.text(`${sign}$${Math.abs(c.value).toFixed(2)}`, x + 5, y + 16);
+        });
+
+        y += 28;
+
+        // ======== NUEVO APARTADO SOLICITADO: CONSOLIDADO GLOBAL DE CUENTAS PENDIENTES ========
+        // Busca en toda la base, sin importar filtros ni cuenta seleccionada
+        const todasPendientesGlobal = allTrans.filter(r => r.amt < 0 && r.status === 'pending');
+        
+        doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...ROJO);
+        doc.text('CONSOLIDADO GLOBAL DE CUENTAS PENDIENTES (TODAS LAS CUENTAS)', mar, y); y += 4;
+
+        if(todasPendientesGlobal.length === 0) {
+            doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(100,100,100);
+            doc.text('¡Excelente! No existen cuentas o saldos pendientes en ninguna de tus cuentas (Personal, Agrícola, Cuscatlán).', mar, y);
+            y += 8;
+        } else {
+            const globalPendRows = todasPendientesGlobal.map(r => {
+                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : Math.abs(r.amt);
+                const abonado = r.abonado || 0;
+                const saldoRestante = deudaBase - abonado;
+                
+                let cuentaOrigen = r.acc === 'personal' ? 'PERSONAL' : `CORRIENTE (${(r.subAcc || 'AGRI').toUpperCase()})`;
+                let catClean = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim().toUpperCase();
+                let vencLabel = '-';
+                if (r.acc === 'corriente') {
+                    const v = getDaysToPay(r.date, r.cuotas_pagadas || 0, r.subAcc);
+                    vencLabel = `${v.label} (${v.days}d)`;
+                }
+                
+                return [
+                    r.date,
+                    cuentaOrigen,
+                    r.desc.substring(0, 30),
+                    catClean.substring(0, 15),
+                    `$${saldoRestante.toFixed(2)}`,
+                    vencLabel
+                ];
+            });
+
+            const totalPendienteGlobalSum = todasPendientesGlobal.reduce((s, r) => {
+                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : Math.abs(r.amt);
+                return s + (deudaBase - (r.abonado || 0));
+            }, 0);
+
+            doc.autoTable({
+                startY: y,
+                head: [['Fecha', 'Cuenta Origen', 'Descripción', 'Categoría', 'Saldo Pendiente', 'Próximo Vence']],
+                body: globalPendRows,
+                foot: [['', '', '', 'TOTAL CONSOLIDADO PENDIENTE', `$${totalPendienteGlobalSum.toFixed(2)}`, '']],
+                margin: { left: mar, right: mar },
+                styles: { fontSize: 7.5, cellPadding: 2.5 },
+                headStyles: { fillColor: OSCURO, textColor: BLANCO, fontStyle: 'bold' },
+                footStyles: { fillColor: ROJO, textColor: BLANCO, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [255, 245, 245] },
+                columnStyles: {
+                    0: { cellWidth: 18 },
+                    1: { cellWidth: 32 },
+                    2: { cellWidth: 50 },
+                    3: { cellWidth: 30 },
+                    4: { cellWidth: 28, halign: 'right' },
+                    5: { cellWidth: 24, halign: 'center' }
+                }
+            });
+            y = doc.lastAutoTable.finalY + 10;
+        }
+
+        // ======== RESUMEN POR CATEGORÍA DE LA CUENTA ACTUAL ========
+        if (y > 230) { doc.addPage(); y = 20; }
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...OSCURO);
+        doc.text('Resumen por Categoría (Vista de Cuenta Actual)', mar, y); y += 4;
+
+        const catRows = Object.entries(catMap).map(([cat, v]) => [
+            cat,
+            v.count.toString(),
+            v.style = v.ing > 0 ? `+$${v.ing.toFixed(2)}` : '-',
+            v.gas > 0 ? `-$${v.gas.toFixed(2)}` : '-',
+            v.ing - v.gas >= 0 ? `+$${(v.ing-v.gas).toFixed(2)}` : `-$${Math.abs(v.ing-v.gas).toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            startY: y,
+            head: [['Categoría', 'Transacciones', 'Ingresos', 'Gastos', 'Balance Neto']],
+            body: catRows.map(row => [row[0], row[1], row[2], row[3], row[4]]),
+            margin: { left: mar, right: mar },
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: AZUL, textColor: BLANCO, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                0: { cellWidth: 65 },
+                1: { cellWidth: 25, halign:'center' },
+                2: { cellWidth: 30, halign:'right', textColor: [16,120,70] },
+                3: { cellWidth: 30, halign:'right', textColor: [180,30,30] },
+                4: { cellWidth: 32, halign:'right' }
+            },
+            didParseCell: (d) => {
+                if (d.section === 'body' && d.column.index === 4) {
+                    d.cell.styles.textColor = d.cell.raw.startsWith('+') ? [16,120,70] : [180,30,30];
+                    d.cell.styles.fontStyle = 'bold';
+                }
+            }
+        });
+
+        y = doc.lastAutoTable.finalY + 10;
+
+        // ======== DETALLE DE TRANSACCIONES DE LA CUENTA ACTUAL ========
+        if (y > 220) { doc.addPage(); y = 20; }
+
+        doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...OSCURO);
+        doc.text('Detalle de Transacciones (Historial Filtrado)', mar, y); y += 4;
+
+        let runBal = sortedReporte.reduce((s,r) => s + r.amt, 0);
+        const txRows = [];
+        [...sortedReporte].reverse().forEach(r => {
+            const statusIcon = r.amt < 0 ? (r.status === 'paid' ? 'Pagado' : 'Pendiente') : '';
+            const cuotaLabel = r.cat === '📅_cuotas' ? ` (${r.cuotas_pagadas||0}/${r.total_cuotas})` : '';
+            let cleanCat = r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim().toUpperCase();
+            
+            txRows.push([
+                r.date,
+                (r.desc + cuotaLabel).substring(0, 40),
+                cleanCat.substring(0, 22),
+                r.amt > 0 ? `+$${r.amt.toFixed(2)}` : '',
+                r.amt < 0 ? `-$${Math.abs(r.amt).toFixed(2)}` : '',
+                `$${runBal.toFixed(2)}`,
+                statusIcon
+            ]);
+            runBal -= r.amt;
+        });
+
+        doc.autoTable({
+            startY: y,
+            head: [['Fecha', 'Descripción', 'Categoría', 'Ingreso', 'Gasto', 'Saldo Corriente', 'Estado']],
+            body: txRows,
+            margin: { left: mar, right: mar },
+            styles: { fontSize: 7, cellPadding: 2.5, overflow: 'ellipsize' },
+            headStyles: { fillColor: OSCURO, textColor: BLANCO, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: {
+                0: { cellWidth: 18 },
+                1: { cellWidth: 55 },
+                2: { cellWidth: 32 },
+                3: { cellWidth: 18, halign:'right', textColor: [16,120,70] },
+                4: { cellWidth: 18, halign:'right', textColor: [180,30,30] },
+                5: { cellWidth: 22, halign:'right', fontStyle:'bold' },
+                6: { cellWidth: 19, halign:'center' }
+            },
+            didParseCell: (d) => {
+                if (d.section === 'body') {
+                    if (d.column.index === 6) {
+                        if (d.cell.raw === 'Pendiente') d.cell.styles.textColor = ROJO;
+                        else if (d.cell.raw === 'Pagado') d.cell.styles.textColor = VERDE;
+                    }
+                    if (d.column.index === 5) {
+                        const val = parseFloat(d.cell.raw.replace('$',''));
+                        d.cell.styles.textColor = val >= 0 ? [16,120,70] : [180,30,30];
+                    }
+                }
+            }
+        });
+
+        // ======== COMPORTAMIENTO PIE DE PÁGINA RECURSIVO ========
+        const pageCount = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= pageCount; p++) {
+            doc.setPage(p);
+            doc.setDrawColor(200,200,200); doc.setLineWidth(0.3);
+            doc.line(mar, 287, pageW - mar, 287);
+            doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140,140,140);
+            doc.text('Finanzas Daniel Pro — Reporte Oficial de Auditoría de Cuentas', mar, 292);
+            doc.text(`Página ${p} de ${pageCount}`, pageW - mar, 292, { align:'right' });
+        }
+
+        const fname = `auditoria_consolidada_${curAcc}_${start||'completo'}.pdf`;
+        doc.save(fname);
     }
 
     function importData(event) {
@@ -514,8 +884,8 @@ function applyCon() {
                 const tx = db.transaction("trans", "readwrite");
                 const st = tx.objectStore("trans");
                 st.clear().onsuccess = () => { data.forEach(item => { st.put(item); }); };
-                tx.oncomplete = () => { alert("Importación exitosa."); render(); refresh(); };
-            } catch (err) { alert("Error al importar."); }
+                tx.oncomplete = () => { alert("Datos importados con éxito desde el archivo JSON."); render(); refresh(); };
+            } catch (err) { alert("Error al parsear el archivo JSON."); }
         };
         reader.readAsText(event.target.files[0]);
     }
