@@ -6,6 +6,7 @@
     <title>Finanzas Daniel Pro - v3.6</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary-p: #2563eb; 
@@ -66,6 +67,27 @@
         .status-pending { background: #fee2e2; color: #991b1b; }
 
         @media screen and (min-width: 600px) { .app-container, .tab-bar { max-width: 800px; } }
+
+        /* --- Módulo WhatsApp --- */
+        .wa-card { background: white; padding: 15px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        .wa-acc-selector { display: flex; background: #E2E8F0; padding: 5px; border-radius: 12px; margin-bottom: 15px; }
+        .wa-acc-btn { flex: 1; padding: 10px; border: none; background: transparent; color: #64748b; font-weight: 700; cursor: pointer; border-radius: 8px; font-size: 0.85rem; }
+        .wa-acc-btn.active { background: white; color: var(--primary-p); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .wa-stat { text-align: center; flex: 1; }
+        .wa-stat p:first-child { font-size: 0.65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin: 0 0 4px; }
+        .wa-stat p:last-child { font-size: 1.1rem; font-weight: 900; margin: 0; }
+        .wa-list-header { background: var(--text-dark); color: white; padding: 14px 16px; border-radius: 16px 16px 0 0; display: flex; justify-content: space-between; align-items: center; }
+        .wa-item { padding: 14px; border-bottom: 1px solid #f1f5f9; }
+        .wa-item-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .wa-check { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.7rem; cursor: pointer; flex-shrink: 0; }
+        .wa-check.on { background: var(--primary-p); border-color: var(--primary-p); }
+        .wa-badge { font-size: 0.6rem; font-weight: 900; padding: 2px 6px; border-radius: 5px; text-transform: uppercase; }
+        .wa-badge.p { background: #dbeafe; color: #1d4ed8; }
+        .wa-badge.c { background: #fef9c3; color: #854d0e; }
+        .wa-badge.debo { background: #fee2e2; color: #991b1b; }
+        .wa-amt-input { width: 85px; padding: 6px 8px 6px 18px; border: 1px solid #e2e8f0; border-radius: 8px; text-align: right; font-weight: 700; font-size: 0.9rem; }
+        .wa-send-btn { width: 100%; background: #25D366; color: white; font-weight: bold; padding: 16px; border: none; border-radius: 0 0 16px 16px; font-size: 1rem; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
+        .wa-send-btn:active { background: #128C7E; }
     </style>
 </head>
 <body>
@@ -100,8 +122,8 @@
             <div class="form-group"><label class="form-label">Fecha</label><input type="date" id="f_date" class="input-ctrl"></div>
             <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="f_desc" class="input-ctrl" placeholder="Descripción"></div>
             <div class="form-group"><label class="form-label">Categoría</label><select id="f_cat" class="input-ctrl" onchange="handleCat(this.value)"></select></div>
-            <div id="grpCuotas" class="form-group hidden"><label class="form-label">Total de cuotas</label><input type="number" id="f_cuotas" class="input-ctrl" placeholder="Ej: 3"></div>
-            <div class="form-group"><label class="form-label">Monto</label><input type="number" id="f_amt" class="input-ctrl" placeholder="0.00" step="0.01"></div>
+            <div id="grpCuotas" class="form-group hidden"><label class="form-label">Total de cuotas</label><input type="number" id="f_cuotas" class="input-ctrl" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 3"></div>
+            <div class="form-group"><label class="form-label">Monto</label><input type="number" id="f_amt" class="input-ctrl" inputmode="decimal" placeholder="0.00" step="0.01"></div>
             <button class="btn-save" id="saveBtn" onclick="doSave()">Guardar Registro</button>
         </div>
     </div>
@@ -123,11 +145,52 @@
         </div>
         <div id="listReg"></div>
     </div>
+
+    <div id="tab-whatsapp" class="tab-content">
+        <h2 style="color:var(--primary-p); margin-bottom:15px;">Enviar Cobros por WhatsApp</h2>
+
+        <div class="wa-acc-selector">
+            <button onclick="waSetAcc('personal')" id="waBtnP" class="wa-acc-btn active">Análisis Personal</button>
+            <button onclick="waSetAcc('corriente')" id="waBtnC" class="wa-acc-btn">Análisis Corriente</button>
+        </div>
+
+        <div class="wa-card">
+            <h2 style="font-size:0.65rem; font-weight:900; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; text-align:center; margin-bottom:12px;">Consumo del Mes: <span id="waLabelAcc">Personal</span></h2>
+            <div style="position:relative; height:160px;"><canvas id="waChart"></canvas></div>
+            <div style="display:flex; justify-content:space-between; margin-top:14px; padding-top:14px; border-top:1px solid #f8fafc;">
+                <div class="wa-stat"><p>Gastos</p><p id="waConsumo" style="color:var(--danger);">$0.00</p></div>
+                <div class="wa-stat" style="border-left:1px solid #f1f5f9;"><p>Ingresos</p><p id="waIngreso" style="color:var(--success);">$0.00</p></div>
+            </div>
+        </div>
+
+        <div style="background:white; border-radius:16px; box-shadow:0 4px 12px rgba(0,0,0,0.08); overflow:hidden;">
+            <div class="wa-list-header">
+                <div>
+                    <h2 style="font-size:0.85rem; font-weight:bold; margin:0;">Cobros Pendientes</h2>
+                    <p style="font-size:0.65rem; opacity:0.7; font-style:italic; margin:2px 0 0;">Personal (Préstamos + Debo) + Corriente</p>
+                </div>
+                <div style="text-align:right;">
+                    <p style="font-size:0.65rem; font-weight:bold; text-transform:uppercase; opacity:0.6; margin:0;">Total Seleccionado</p>
+                    <p id="waSubtotal" style="font-size:1.5rem; font-weight:900; color:#FCDB3F; letter-spacing:-0.5px; margin:0;">$0.00</p>
+                </div>
+            </div>
+
+            <div id="waLista" style="max-height:450px; overflow-y:auto;">
+                <div style="padding:30px; text-align:center; color:#94a3b8; font-style:italic; font-size:0.85rem;">Cargando datos...</div>
+            </div>
+
+            <button onclick="waCompartirWhatsApp()" class="wa-send-btn">
+                <span>Enviar a WhatsApp</span>
+                <svg style="width:20px;height:20px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.396.015 12.03c0 2.12.554 4.189 1.605 6.006L0 24l6.117-1.605a11.803 11.803 0 005.925 1.588h.005c6.631 0 12.026-5.396 12.029-12.03a11.79 11.79 0 00-3.517-8.503z"/></svg>
+            </button>
+        </div>
+    </div>
 </div>
 
 <nav class="tab-bar">
     <button class="tab-item active" onclick="nav('inicio', this)">🏠<span>Inicio</span></button>
     <button class="tab-item" onclick="nav('registros', this)">📋<span>Registros</span></button>
+    <button class="tab-item" onclick="nav('whatsapp', this)">📲<span>WhatsApp</span></button>
 </nav>
 
 <div id="modalGeneric" class="modal-overlay">
@@ -136,6 +199,7 @@
 
 <script>
     let db, curAcc = 'personal', curSub = 'agricola', selIds = [], selNames = [], selAmounts = {}, tSum = 0;
+    let selCatsMap = {}, conNetSigned = null;
     const incomeRules = ['quincena', 'ahorro', '💳_pago', '🤑_pago_prestamo'];
     const limits = { agricola: 400, cuscatlan: 810 };
 
@@ -151,7 +215,15 @@
         if(!d.objectStoreNames.contains("trans")) d.createObjectStore("trans", { keyPath: "id", autoIncrement: true });
     };
 
-    function init() { document.getElementById('f_date').valueAsDate = new Date(); updateCats(); }
+    function todayLocalISO() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function init() { document.getElementById('f_date').value = todayLocalISO(); updateCats(); }
 
     // --- LÓGICA DE FECHAS CON DÍAS CONFIGURABLES ---
     function getDaysToPay(purchaseDateStr, cuotasPagadas = 0, subAcc = null) {
@@ -183,6 +255,7 @@
         document.getElementById('tab-'+id).classList.add('active');
         b.classList.add('active');
         if(id === 'registros') render();
+        if(id === 'whatsapp') waRender();
     }
 
     function changeAcc(a) {
@@ -219,11 +292,11 @@
             <p style="color:#64748b; font-size:0.85rem;">Configura los días de corte y pago para la cuenta <b>${curSub}</b>.</p>
             <div class="form-group">
                 <label class="form-label">Día de Corte (1-31)</label>
-                <input type="number" id="cfg_cut" class="input-ctrl" min="1" max="31" value="${cfg.cutDay}">
+                <input type="number" id="cfg_cut" class="input-ctrl" inputmode="numeric" pattern="[0-9]*" min="1" max="31" value="${cfg.cutDay}">
             </div>
             <div class="form-group">
                 <label class="form-label">Día de Pago (1-31)</label>
-                <input type="number" id="cfg_pay" class="input-ctrl" min="1" max="31" value="${cfg.payDay}">
+                <input type="number" id="cfg_pay" class="input-ctrl" inputmode="numeric" pattern="[0-9]*" min="1" max="31" value="${cfg.payDay}">
             </div>
             <div style="background:#fef9c3; border:1px solid #fde047; padding:10px; border-radius:8px; font-size:0.8rem; color:#854d0e; margin-bottom:15px;">
                 💡 Ej: Corte día 9 → compras antes del 9 pagan el día 6 del mes siguiente. Compras después del 9 pagan el día 6 en dos meses.
@@ -253,7 +326,7 @@
     function updateCats() {
         const s = document.getElementById('f_cat'); s.innerHTML = '';
         const c = curAcc === 'personal' ? 
-            [{v:'🛒_dia_a_dia',t:'🛒 Día a Día'},{v:'📉_pasivo',t:'📉 Pasivo'},{v:'🍕_recreacion',t:'🍕 Recreación'},{v:'💰_ahorro',t:'💰 Ahorro'},{v:'💵_quincena',t:'💵 Quincena'},{v:'🏦_prestamo',t:'🏦 Préstamo'},{v:'🤑_pago_prestamo',t:'🤑 Pago Préstamo'},{v:'💳_pago_tarjeta',t:'💳 Pago Tarjeta'}] :
+            [{v:'🛒_dia_a_dia',t:'🛒 Día a Día'},{v:'📉_pasivo',t:'📉 Pasivo'},{v:'🍕_recreacion',t:'🍕 Recreación'},{v:'💰_ahorro',t:'💰 Ahorro'},{v:'💵_quincena',t:'💵 Quincena'},{v:'🏦_prestamo',t:'🏦 Préstamo (me deben)'},{v:'🫴_debo',t:'🫴 Debo (yo debo)'},{v:'🤑_pago_prestamo',t:'🤑 Pago Préstamo'},{v:'💳_pago_tarjeta',t:'💳 Pago Tarjeta'}] :
             [{v:'🛒_dia_a_dia',t:'🛒 Día a Día'},{v:'📉_pasivo',t:'📉 Pasivo'},{v:'🍕_recreacion',t:'🍕 Recreación'},{v:'📅_cuotas',t:'📅 Cuotas'},{v:'💳_pago',t:'💳 Pago'}];
         c.forEach(x => { let o = document.createElement('option'); o.value = x.v; o.innerText = x.t; s.appendChild(o); });
     }
@@ -269,13 +342,13 @@ function openConciliacion(cat) {
     selIds = []; tSum = 0; selNames = []; selAmounts = {};
     
     let targetAcc = cat.includes('prestamo') ? 'personal' : 'corriente';
-    let targetCats = cat.includes('prestamo') ? ['🏦_prestamo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
+    let targetCats = cat.includes('prestamo') ? ['🏦_prestamo', '🫴_debo'] : ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
 
     db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
         const pending = e.target.result.filter(r => {
             const accMatch = r.acc === targetAcc;
             const catMatch = targetCats.includes(r.cat);
-            const isDebt = r.amt < 0 && r.status === 'pending';
+            const isDebt = r.status === 'pending' && (r.cat === '🫴_debo' ? true : r.amt < 0);
             const subMatch = (curAcc === 'personal') ? true : (r.subAcc === curSub);
             return accMatch && isDebt && catMatch && subMatch;
         });
@@ -297,18 +370,19 @@ function openConciliacion(cat) {
         }
 
         pending.forEach(r => {
-            let totalDeuda = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : Math.abs(r.amt);
+            let totalDeuda = r.cat === '📅_cuotas' ? (Math.abs(r.amt)/r.total_cuotas) : (r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt));
             let yaPagado = r.abonado || 0;
             let saldoPendiente = totalDeuda - yaPagado;
             let venc = (r.acc === 'corriente') ? getDaysToPay(r.date, r.cuotas_pagadas || 0, r.subAcc) : null;
+            let debtTag = r.cat === '🫴_debo' ? '<span style="background:#fee2e2;color:#991b1b;font-size:0.6rem;font-weight:900;padding:1px 5px;border-radius:5px;">YO DEBO</span>' : (r.cat === '🏦_prestamo' ? '<span style="background:#dbeafe;color:#1d4ed8;font-size:0.6rem;font-weight:900;padding:1px 5px;border-radius:5px;">ME DEBEN</span>' : '');
 
             let d = document.createElement('div');
             d.style = "padding:10px; border-bottom:1px solid #f1f5f9;";
             d.innerHTML = `
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <input type="checkbox" id="chk_${r.id}" onchange="tick(${r.id},'${r.desc.replace(/'/g,"\\'")}','${r.subAcc||'agricola'}')">
+                    <input type="checkbox" id="chk_${r.id}" onchange="tick(${r.id},'${r.desc.replace(/'/g,"\\'")}','${r.subAcc||'agricola'}','${r.cat}')">
                     <div style="flex:1;">
-                        <b style="font-size:0.9rem;">${r.desc}</b>
+                        <b style="font-size:0.9rem;">${r.desc}</b> ${debtTag}
                         <br><small style="color:#64748b;">${(r.subAcc||'agricola').toUpperCase()} | ${r.cat.replace(/_/g,' ').replace(/[^\w\s]/gu,'').trim()}${yaPagado > 0 ? ` | abonado: $${yaPagado.toFixed(2)}` : ''}</small>
                         ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Vence en ${venc.days}d — ${venc.label}</span>` : ''}
                     </div>
@@ -318,7 +392,7 @@ function openConciliacion(cat) {
                     <label style="font-size:0.8rem;color:#64748b;flex:1;">Monto a abonar:</label>
                     <input type="number" id="amt_${r.id}" class="input-ctrl" 
                            style="width:110px; padding:8px; font-size:0.95rem; font-weight:bold; text-align:right;"
-                           step="0.01" min="0.01" max="${saldoPendiente.toFixed(2)}" 
+                           inputmode="decimal" step="0.01" min="0.01" max="${saldoPendiente.toFixed(2)}" 
                            value="${saldoPendiente.toFixed(2)}"
                            oninput="updateItemAmt(${r.id})">
                 </div>`;
@@ -330,7 +404,7 @@ function openConciliacion(cat) {
 
     let tempSub = 'agricola';
 
-function tick(id, name, sub) {
+function tick(id, name, sub, cat) {
     const chk = document.getElementById(`chk_${id}`);
     const row = document.getElementById(`row_${id}`);
     const amtInput = document.getElementById(`amt_${id}`);
@@ -339,11 +413,13 @@ function tick(id, name, sub) {
     if (chk.checked) {
         if (idx === -1) { selIds.push(id); selNames.push(name); }
         selAmounts[id] = parseFloat(amtInput.value) || 0;
+        selCatsMap[id] = cat;
         row.style.display = 'flex';
         tempSub = sub;
     } else {
         if (idx > -1) { selIds.splice(idx,1); selNames.splice(selNames.indexOf(name),1); }
         delete selAmounts[id];
+        delete selCatsMap[id];
         row.style.display = 'none';
     }
     recalcTotal();
@@ -365,6 +441,13 @@ function recalcTotal() {
 
 function applyCon() { 
     if (selIds.length === 0) { alert("Selecciona al menos un ítem."); return; }
+
+    // Signo neto: liquidar un "Préstamo" (me pagan) suma al saldo; liquidar un "Debo" (yo pago) resta.
+    conNetSigned = selIds.reduce((s, id) => {
+        const amt = selAmounts[id] || 0;
+        return s + (selCatsMap[id] === '🫴_debo' ? -amt : amt);
+    }, 0);
+
     document.getElementById('f_amt').value = tSum.toFixed(2);
     if(selIds.length === 1) document.getElementById('f_desc').value = "Abono: " + selNames[0];
     else document.getElementById('f_desc').value = `Abono: ${selIds.length} items`;
@@ -380,17 +463,29 @@ function applyCon() {
         if(!de || isNaN(am)) return alert("Datos incompletos");
 
         const tx = db.transaction("trans", "readwrite"), st = tx.objectStore("trans");
-        let finalAmt = (incomeRules.some(r => ca.includes(r)) && ca !== '💳_pago_tarjeta') ? am : -am;
 
-        // Status: corriente gastos = pending. Personal solo prestamo = pending. Resto = paid.
+        let finalAmt;
+        if (ca === '🫴_debo') {
+            // Registrar una deuda propia no debe mover el saldo hasta que se pague.
+            finalAmt = 0;
+        } else if (ca === '🤑_pago_prestamo' && conNetSigned !== null) {
+            // Viene de la conciliación: puede sumar (préstamo que me pagan) o restar (debo que yo pago).
+            finalAmt = conNetSigned;
+        } else {
+            finalAmt = (incomeRules.some(r => ca.includes(r)) && ca !== '💳_pago_tarjeta') ? am : -am;
+        }
+
+        // Status: corriente gastos = pending. Personal prestamo/debo = pending. Resto = paid.
         let initialStatus;
-        if (finalAmt > 0) initialStatus = 'paid';
+        if (ca === '🫴_debo') initialStatus = 'pending';
+        else if (finalAmt > 0) initialStatus = 'paid';
         else if (curAcc === 'corriente') initialStatus = 'pending';
         else if (ca === '🏦_prestamo') initialStatus = 'pending';
         else initialStatus = 'paid';
 
-        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status: initialStatus, kids:[...selIds], ts:Date.now() };
+        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status: initialStatus, kids:[...selIds], kidAmounts:{...selAmounts}, ts:Date.now() };
         if (ca === '📅_cuotas') { entry.total_cuotas = parseInt(document.getElementById('f_cuotas').value) || 1; entry.cuotas_pagadas = 0; }
+        if (ca === '🫴_debo') { entry.debtAmt = am; }
 
         if (curAcc === 'personal' && ca === '💳_pago_tarjeta') {
             st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', subAcc: curSub, status:'paid', ts:Date.now() + 1 });
@@ -403,7 +498,7 @@ function applyCon() {
             st.get(id).onsuccess = (e) => {
                 let res = e.target.result;
                 if(!res) return;
-                let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : Math.abs(res.amt);
+                let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : (res.cat === '🫴_debo' ? (res.debtAmt||0) : Math.abs(res.amt));
                 let yaAbonado = res.abonado || 0;
                 let pendiente = deudaTotal - yaAbonado;
 
@@ -435,7 +530,7 @@ function applyCon() {
         document.getElementById('f_desc').value=''; 
         document.getElementById('f_amt').value=''; 
         document.getElementById('f_cuotas').value=''; 
-        selIds=[]; selNames=[]; selAmounts={}; tSum=0;
+        selIds=[]; selNames=[]; selAmounts={}; tSum=0; selCatsMap={}; conNetSigned=null;
     }
 
     function refresh() {
@@ -498,9 +593,11 @@ function applyCon() {
             sorted.forEach(r => {
                 let d = document.createElement('div');
                 d.className = `reg-item`;
-                d.style.borderLeftColor = r.amt > 0 ? 'var(--success)' : 'var(--danger)';
+                const isDebo = r.cat === '🫴_debo';
+                const displayAmt = isDebo ? -(r.debtAmt || 0) : r.amt;
+                d.style.borderLeftColor = displayAmt > 0 ? 'var(--success)' : 'var(--danger)';
                 
-                let st = r.amt < 0 ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
+                let st = (r.amt < 0 || isDebo) ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
                 let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
                 let bName = r.acc === 'corriente' ? `[${(r.subAcc||'AGRI').toUpperCase()}] ` : '';
 
@@ -514,8 +611,8 @@ function applyCon() {
                         ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Prox: ${venc.label} (${venc.days}d)</span>` : ''}
                     </div>
                     <div style="text-align:right; margin-right:30px">
-                        <div style="font-weight:bold; color:${r.amt>0?'var(--success)':'var(--danger)'}">${r.amt>0?'+':''}$${Math.abs(r.amt).toFixed(2)}</div>
-                        <div style="font-size:0.7rem; color:gray">Saldo: $${runningBalance.toFixed(2)}</div>
+                        <div style="font-weight:bold; color:${displayAmt>0?'var(--success)':'var(--danger)'}">${displayAmt>0?'+':''}$${Math.abs(displayAmt).toFixed(2)}</div>
+                        <div style="font-size:0.7rem; color:gray">${isDebo ? 'No afecta saldo' : 'Saldo: $'+runningBalance.toFixed(2)}</div>
                     </div>
                     <button class="edit-btn">✏️</button>`;
                 
@@ -534,14 +631,33 @@ function applyCon() {
         if(!r) return;
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
-        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()} (${(r.subAcc||'agricola').toUpperCase()})</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${Math.abs(r.amt).toFixed(2)}</p><hr>`;
+        const dispAmt = r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt);
+        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()} (${(r.subAcc||'agricola').toUpperCase()})</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${dispAmt.toFixed(2)}${r.cat === '🫴_debo' ? ' <small style="color:#991b1b;">(deuda — no afecta saldo)</small>' : ''}</p>`;
+        if (r.amt < 0 || r.cat === '🫴_debo') {
+            if (r.status === 'paid') {
+                html += `<p style="font-size:0.8rem;color:#166534;"><b>✅ Liquidado por completo.</b></p>`;
+            } else if (r.abonado && r.abonado > 0) {
+                const restante = dispAmt - r.abonado;
+                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Pago parcial:</b> abonado $${r.abonado.toFixed(2)} de $${dispAmt.toFixed(2)} — <b>pendiente $${restante.toFixed(2)}</b></p>`;
+            } else if (r.cat === '📅_cuotas' && r.cuotas_pagadas > 0) {
+                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Cuotas pagadas:</b> ${r.cuotas_pagadas} de ${r.total_cuotas}</p>`;
+            } else {
+                html += `<p style="font-size:0.8rem;color:#991b1b;"><b>⏳ Pendiente de pago.</b></p>`;
+            }
+        }
+        html += `<hr>`;
         const parent = all.find(p => p.kids && p.kids.includes(Number(id)));
         if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por:</small><br><b>${parent.desc}</b></div>`;
         if(r.kids && r.kids.length > 0) {
             html += `<h4>Liquidó a:</h4>`;
             r.kids.forEach(kId => {
                 const kid = all.find(k => k.id === kId);
-                if(kid) html += `<div style="font-size:0.8rem; border-bottom:1px solid #eee; padding:4px 0;">${kid.desc} ($${(Math.abs(kid.amt)/(kid.total_cuotas||1)).toFixed(2)})</div>`;
+                if(kid) {
+                    const kidTotal = kid.cat === '🫴_debo' ? (kid.debtAmt||0) : (Math.abs(kid.amt)/(kid.total_cuotas||1));
+                    const montoAplicado = (r.kidAmounts && r.kidAmounts[kId] !== undefined) ? r.kidAmounts[kId] : kidTotal;
+                    const fueParcial = montoAplicado < kidTotal - 0.005;
+                    html += `<div style="font-size:0.8rem; border-bottom:1px solid #eee; padding:4px 0;">${kid.desc}: $${montoAplicado.toFixed(2)} ${fueParcial ? `<span style="color:#b45309;font-weight:bold;">(abono parcial de $${kidTotal.toFixed(2)}, aún pendiente)</span>` : `<span style="color:#166534;font-weight:bold;">(liquidado)</span>`}</div>`;
+                }
             });
         }
         html += `<button onclick="closeModal()" class="btn-save" style="background:var(--text-dark); margin-top:15px">Cerrar</button>`;
@@ -552,10 +668,11 @@ function applyCon() {
     function editReg(id) {
         db.transaction("trans","readonly").objectStore("trans").get(id).onsuccess = (e) => {
             const r = e.target.result;
+            const dispAmt = r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt);
             const content = document.getElementById('modalContent');
             content.innerHTML = `<h3>Editar</h3>
                 <div class="form-group"><label>Descripción</label><input type="text" id="ed_desc" class="input-ctrl" value="${r.desc}"></div>
-                <div class="form-group"><label>Monto</label><input type="number" id="ed_amt" class="input-ctrl" value="${Math.abs(r.amt)}"></div>
+                <div class="form-group"><label>Monto</label><input type="number" id="ed_amt" class="input-ctrl" inputmode="decimal" value="${dispAmt}"></div>
                 <button onclick="saveEdit(${r.id})" class="btn-save">Guardar</button>
                 <button onclick="deleteReg(${r.id})" style="width:100%; color:red; margin-top:10px; background:none; border:none;">🗑️ Eliminar</button>
                 <button onclick="closeModal()" style="width:100%; margin-top:10px; border:none; background:none;">Cancelar</button>`;
@@ -569,7 +686,8 @@ function applyCon() {
             const r = e.target.result;
             r.desc = document.getElementById('ed_desc').value;
             const nAmt = parseFloat(document.getElementById('ed_amt').value);
-            r.amt = r.amt < 0 ? -nAmt : nAmt;
+            if (r.cat === '🫴_debo') { r.debtAmt = nAmt; r.amt = 0; }
+            else { r.amt = r.amt < 0 ? -nAmt : nAmt; }
             st.put(r);
             tx.oncomplete = () => { closeModal(); render(); refresh(); };
         };
@@ -578,13 +696,19 @@ function applyCon() {
     function deleteReg(id) {
         if(!confirm("¿Borrar registro?")) return;
         const tx = db.transaction("trans", "readwrite");
-        tx.objectStore("trans").delete(id).oncomplete = () => { closeModal(); render(); refresh(); };
+        tx.objectStore("trans").delete(id);
+        tx.oncomplete = () => {
+            closeModal();
+            render();
+            refresh();
+            if (document.getElementById('tab-whatsapp').classList.contains('active')) waRender();
+        };
     }
 
     function exportData() {
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
             const blob = new Blob([JSON.stringify(e.target.result, null, 2)], { type: "application/json" });
-            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_${new Date().toISOString().split('T')[0]}.json`; a.click();
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `backup_${todayLocalISO()}.json`; a.click();
         };
     }
 
@@ -611,7 +735,7 @@ function applyCon() {
         const ingresos  = sorted.filter(r => r.amt > 0).reduce((s,r) => s + r.amt, 0);
         const gastos    = sorted.filter(r => r.amt < 0).reduce((s,r) => s + Math.abs(r.amt), 0);
         const neto      = ingresos - gastos;
-        const pendientes = sorted.filter(r => r.amt < 0 && r.status === 'pending');
+        const pendientes = sorted.filter(r => (r.amt < 0 || r.cat === '🫴_debo') && r.status === 'pending');
 
         // Categorías agrupadas
         const catMap = {};
@@ -742,7 +866,7 @@ function applyCon() {
         const txRows = [];
         [...sorted].reverse().forEach(r => {
             const statusIcon = r.amt < 0 ? (r.status === 'paid' ? 'Pagado' : 'Pendiente') : '';
-            const cuotaLabel = r.cat === '📅_cuotas' ? ` (${r.cuotas_pagadas}/${r.total_cuotas})` : '';
+            const cuotaLabel = r.cat === '📅_cuotas' ? ` (${r.cuotas_pagadas}/${r.total_cuotas})` : (r.cat === '🫴_debo' ? ` (Debo: $${(r.debtAmt||0).toFixed(2)})` : '');
             txRows.push([
                 r.date,
                 (r.desc + cuotaLabel).substring(0, 38),
@@ -795,7 +919,7 @@ function applyCon() {
             doc.text(`Cargos Pendientes (${pendientes.length})`, mar, y); y += 4;
 
             const pendRows = pendientes.map(r => {
-                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : Math.abs(r.amt);
+                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : (r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt));
                 const abonado = r.abonado || 0;
                 const saldo = deudaBase - abonado;
                 let vencLabel = '-';
@@ -812,7 +936,7 @@ function applyCon() {
                 ];
             });
             const totalPend = pendientes.reduce((s,r) => {
-                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : Math.abs(r.amt);
+                const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : (r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt));
                 return s + (deudaBase - (r.abonado || 0));
             }, 0);
 
@@ -851,7 +975,7 @@ function applyCon() {
 
         if (pendientes.length > 0) {
             const totalPend2 = pendientes.reduce((s,r) => {
-                const db2 = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : Math.abs(r.amt);
+                const db2 = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : (r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt));
                 return s + (db2 - (r.abonado || 0));
             }, 0);
             obs.push({ icon: '⚠', text: `Existen ${pendientes.length} cargo(s) pendiente(s) por un total de -$${totalPend2.toFixed(2)}.`, tipo:'alerta' });
@@ -893,6 +1017,174 @@ function applyCon() {
         // Guardar
         const fname = `auditoria_${curAcc}_${start||'inicio'}_${end||'fin'}.pdf`;
         doc.save(fname);
+    }
+
+    /* ================= MÓDULO WHATSAPP ================= */
+    let waAcc = 'personal', waSeleccionados = [], waChart = null;
+    const waEmojiMap = {
+        'anda': '💧', 'caess': '⚡', 'aes': '⚡', 'tigo': '🌐', 'claro': '📱',
+        'pupusas': '🫓', 'frances': '🥖', 'pan': '🥖', 'pollo': '🍗', 'campero': '🍗',
+        'utec': '🎓', 'gato': '🐱', 'moto': '🏍️', 'gasolina': '⛽'
+    };
+
+    function waSetAcc(acc) {
+        waAcc = acc;
+        document.getElementById('waBtnP').classList.toggle('active', acc === 'personal');
+        document.getElementById('waBtnC').classList.toggle('active', acc === 'corriente');
+        document.getElementById('waLabelAcc').innerText = acc === 'personal' ? 'Personal' : 'Corriente';
+        waRender();
+    }
+
+    function waRender() {
+        if (!db) return;
+        db.transaction("trans", "readonly").objectStore("trans").getAll().onsuccess = (e) => {
+            const fullData = e.target.result;
+            const ahora = new Date();
+            const mesActual = ahora.getMonth(), anioActual = ahora.getFullYear();
+
+            // --- Consumo del mes para la cuenta seleccionada ---
+            const dataMes = fullData.filter(r => {
+                const f = new Date(r.date);
+                return r.acc === waAcc && f.getUTCMonth() === mesActual && f.getUTCFullYear() === anioActual;
+            });
+
+            let totalIngresos = 0, totalGastos = 0;
+            const categoriasGastos = {};
+
+            dataMes.forEach(r => {
+                const isIncome = incomeRules.some(rule => r.cat.includes(rule)) && r.cat !== '💳_pago_tarjeta';
+                if (isIncome) totalIngresos += Math.abs(r.amt);
+                else if (r.cat !== '🫴_debo') { // una deuda registrada no es "gasto" del mes hasta que se paga
+                    const monto = Math.abs(r.amt);
+                    totalGastos += monto;
+                    const catNombre = r.cat.split('_')[1] || r.cat;
+                    categoriasGastos[catNombre] = (categoriasGastos[catNombre] || 0) + monto;
+                }
+            });
+
+            document.getElementById('waIngreso').innerText = `$${totalIngresos.toFixed(2)}`;
+            document.getElementById('waConsumo').innerText = `$${totalGastos.toFixed(2)}`;
+            waUpdateChart(categoriasGastos);
+
+            // --- Checklist unificado: Personal (Préstamos + Debo) + Corriente ---
+            const pendientesGlobales = fullData.filter(r => {
+                if (r.status !== 'pending') return false;
+                if (r.cat !== '🫴_debo' && r.amt >= 0) return false;
+
+                if (r.acc === 'personal') return r.cat === '🏦_prestamo' || r.cat === '🫴_debo';
+
+                const catC = ['🛒_dia_a_dia', '📉_pasivo', '🍕_recreacion', '📅_cuotas'];
+                return catC.some(tc => r.cat.includes(tc));
+            });
+
+            waRenderChecklist(pendientesGlobales);
+        };
+    }
+
+    function waRenderChecklist(items) {
+        const list = document.getElementById('waLista');
+        list.innerHTML = '';
+        if (items.length === 0) {
+            list.innerHTML = '<div style="padding:30px; text-align:center; color:#94a3b8; font-style:italic; font-size:0.85rem;">Sin cobros pendientes.</div>';
+            waActualizarSumaTotal();
+            return;
+        }
+        items.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        items.forEach(r => {
+            const sel = waSeleccionados.find(s => s.id === r.id);
+            const isChecked = !!sel;
+
+            let montoInicial = r.cat === '🫴_debo' ? (r.debtAmt || 0) : Math.abs(r.amt);
+            if (r.cat === '📅_cuotas') montoInicial = montoInicial / (r.total_cuotas || 1);
+            const saldoReal = montoInicial - (r.abonado || 0);
+
+            const badgeAcc = r.acc === 'personal' ? '<span class="wa-badge p">P</span>' : '<span class="wa-badge c">C</span>';
+            const badgeDebo = r.cat === '🫴_debo' ? '<span class="wa-badge debo">Yo debo</span>' : '';
+
+            const div = document.createElement('div');
+            div.className = 'wa-item';
+            div.style.background = isChecked ? '#eff6ff' : 'white';
+            div.innerHTML = `
+                <div class="wa-item-top">
+                    <div style="display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="waToggleItem(${r.id}, ${saldoReal})">
+                        <div class="wa-check ${isChecked ? 'on' : ''}">${isChecked ? '✓' : ''}</div>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <span style="font-weight:bold; font-size:0.9rem; color:var(--text-dark);">${r.desc}</span>
+                                ${badgeAcc}${badgeDebo}
+                            </div>
+                            <p style="font-size:0.65rem; color:#94a3b8; font-weight:bold; text-transform:uppercase; margin:2px 0 0;">${r.cat.replace(/_/g,' ')} | ${r.date}</p>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="position:relative;">
+                            <span style="position:absolute; left:6px; top:6px; font-size:0.75rem; font-weight:bold; color:#94a3b8;">$</span>
+                            <input type="number" value="${sel ? sel.saldoEditado : saldoReal.toFixed(2)}"
+                                onchange="waUpdateMonto(${r.id}, this.value)" class="wa-amt-input" inputmode="decimal" step="0.01">
+                        </div>
+                        <p style="font-size:0.6rem; color:#cbd5e1; margin:3px 0 0;">Sugerido: $${saldoReal.toFixed(2)}</p>
+                    </div>
+                </div>`;
+            list.appendChild(div);
+        });
+        waActualizarSumaTotal();
+    }
+
+    function waToggleItem(id, saldo) {
+        const idx = waSeleccionados.findIndex(s => s.id === id);
+        if (idx > -1) {
+            waSeleccionados.splice(idx, 1);
+            waRender();
+        } else {
+            db.transaction("trans", "readonly").objectStore("trans").get(id).onsuccess = (e) => {
+                const item = e.target.result;
+                if (!item) return;
+                waSeleccionados.push({ id: id, desc: item.desc, cat: item.cat, saldoEditado: saldo.toFixed(2), acc: item.acc });
+                waRender();
+            };
+        }
+    }
+
+    function waUpdateMonto(id, nuevoValor) {
+        const sel = waSeleccionados.find(s => s.id === id);
+        if (sel) {
+            sel.saldoEditado = parseFloat(nuevoValor).toFixed(2);
+            waActualizarSumaTotal();
+        }
+    }
+
+    function waActualizarSumaTotal() {
+        const total = waSeleccionados.reduce((acc, s) => acc + parseFloat(s.saldoEditado), 0);
+        document.getElementById('waSubtotal').innerText = `$${total.toFixed(2)}`;
+    }
+
+    function waUpdateChart(data) {
+        const ctx = document.getElementById('waChart').getContext('2d');
+        if (waChart) waChart.destroy();
+        waChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(data),
+                datasets: [{ data: Object.values(data), backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'], borderWidth: 2 }]
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 9 } } } } }
+        });
+    }
+
+    function waCompartirWhatsApp() {
+        if (waSeleccionados.length === 0) return alert("Selecciona cobros primero.");
+        let msg = "📝 *CUENTAS POR LIQUIDAR*\n━━━━━━━━━━━━━━━━━━\n\n";
+        waSeleccionados.forEach(s => {
+            let emoji = s.cat.split('_')[0] || '💸';
+            const d = s.desc.toLowerCase();
+            for (let k in waEmojiMap) if (d.includes(k)) { emoji = waEmojiMap[k]; break; }
+            const cuenta = s.acc === 'personal' ? "(P)" : "(C)";
+            msg += `${emoji} *${s.desc.trim()}* ${cuenta}: $${s.saldoEditado}\n`;
+        });
+        const total = waSeleccionados.reduce((acc, s) => acc + parseFloat(s.saldoEditado), 0);
+        msg += `\n━━━━━━━━━━━━━━━━━━\n💰 *TOTAL: $${total.toFixed(2)}*`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
     }
 
     function importData(event) {
