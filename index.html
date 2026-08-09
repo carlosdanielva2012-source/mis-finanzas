@@ -712,6 +712,48 @@ function applyCon() {
         };
     }
 
+    // ---- Utilidades para mostrar emojis en el PDF ----
+    // jsPDF usa fuentes vectoriales (Helvetica) que NO tienen glifos de emoji,
+    // por eso salían caracteres corruptos ("Ø=ÞÒ", etc). La solución sin
+    // necesidad de librerías extra: dibujamos el emoji en un <canvas> oculto
+    // (el navegador ya sabe pintar emojis a color con su fuente nativa:
+    // Apple Color Emoji / Segoe UI Emoji / Noto Color Emoji) y lo insertamos
+    // en el PDF como imagen PNG en vez de como texto.
+    const _emojiImgCache = {};
+    function emojiToPNG(emoji, px = 96) {
+        if (!emoji) return null;
+        if (_emojiImgCache[emoji]) return _emojiImgCache[emoji];
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = px; canvas.height = px;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, px, px);
+            ctx.font = `${Math.round(px * 0.78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(emoji, px / 2, px / 2 + px * 0.04);
+            const url = canvas.toDataURL('image/png');
+            _emojiImgCache[emoji] = url;
+            return url;
+        } catch (err) { return null; }
+    }
+    // Las categorías se guardan como "emoji_palabra_palabra" (ver handleCat, etc.)
+    // Esta función separa el emoji del texto para poder renderizarlos por separado.
+    function splitCatEmoji(catStr) {
+        if (!catStr) return { emoji: null, label: '' };
+        const idx = catStr.indexOf('_');
+        if (idx > -1) {
+            return { emoji: catStr.substring(0, idx), label: catStr.substring(idx + 1).replace(/_/g, ' ') };
+        }
+        return { emoji: null, label: catStr };
+    }
+    // Dibuja un emoji como imagen dentro de una celda de autoTable, alineado verticalmente al centro
+    function drawCellEmoji(doc, cell, emoji, size = 4.2) {
+        const img = emojiToPNG(emoji);
+        if (!img) return;
+        doc.addImage(img, 'PNG', cell.x + 2, cell.y + cell.height / 2 - size / 2, size, size);
+    }
+
     async function exportPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -740,7 +782,7 @@ function applyCon() {
         // Categorías agrupadas
         const catMap = {};
         sorted.forEach(r => {
-            const key = r.cat.replace(/_/g,' ');
+            const key = r.cat; // se mantiene el emoji original; se separa al momento de renderizar
             if (!catMap[key]) catMap[key] = { ing: 0, gas: 0, count: 0 };
             if (r.amt > 0) catMap[key].ing += r.amt; else catMap[key].gas += Math.abs(r.amt);
             catMap[key].count++;
@@ -822,13 +864,18 @@ function applyCon() {
         doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...OSCURO);
         doc.text('Resumen por Categoria', mar, y); y += 4;
 
-        const catRows = Object.entries(catMap).map(([cat, v]) => [
-            cat,
-            v.count.toString(),
-            v.ing > 0 ? `+$${v.ing.toFixed(2)}` : '-',
-            v.gas > 0 ? `-$${v.gas.toFixed(2)}` : '-',
-            v.ing - v.gas >= 0 ? `+$${(v.ing-v.gas).toFixed(2)}` : `-$${Math.abs(v.ing-v.gas).toFixed(2)}`
-        ]);
+        const catEmojis = [];
+        const catRows = Object.entries(catMap).map(([cat, v]) => {
+            const { emoji, label } = splitCatEmoji(cat);
+            catEmojis.push(emoji);
+            return [
+                label,
+                v.count.toString(),
+                v.ing > 0 ? `+$${v.ing.toFixed(2)}` : '-',
+                v.gas > 0 ? `-$${v.gas.toFixed(2)}` : '-',
+                v.ing - v.gas >= 0 ? `+$${(v.ing-v.gas).toFixed(2)}` : `-$${Math.abs(v.ing-v.gas).toFixed(2)}`
+            ];
+        });
 
         doc.autoTable({
             startY: y,
@@ -839,7 +886,7 @@ function applyCon() {
             headStyles: { fillColor: OSCURO, textColor: BLANCO, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             columnStyles: {
-                0: { cellWidth: 65 },
+                0: { cellWidth: 65, cellPadding: { top: 3, bottom: 3, left: 9, right: 3 } },
                 1: { cellWidth: 15, halign:'center' },
                 2: { cellWidth: 30, halign:'right', textColor: [16,120,70] },
                 3: { cellWidth: 30, halign:'right', textColor: [180,30,30] },
@@ -849,6 +896,11 @@ function applyCon() {
                 if (d.section === 'body' && d.column.index === 4) {
                     d.cell.styles.textColor = d.cell.raw.startsWith('+') ? [16,120,70] : [180,30,30];
                     d.cell.styles.fontStyle = 'bold';
+                }
+            },
+            didDrawCell: (d) => {
+                if (d.section === 'body' && d.column.index === 0) {
+                    drawCellEmoji(doc, d.cell, catEmojis[d.row.index]);
                 }
             }
         });
@@ -864,13 +916,16 @@ function applyCon() {
 
         let runBal = sorted.reduce((s,r) => s + r.amt, 0);
         const txRows = [];
+        const txCatEmojis = [];
         [...sorted].reverse().forEach(r => {
             const statusIcon = r.amt < 0 ? (r.status === 'paid' ? 'Pagado' : 'Pendiente') : '';
             const cuotaLabel = r.cat === '📅_cuotas' ? ` (${r.cuotas_pagadas}/${r.total_cuotas})` : (r.cat === '🫴_debo' ? ` (Debo: $${(r.debtAmt||0).toFixed(2)})` : '');
+            const { emoji, label } = splitCatEmoji(r.cat);
+            txCatEmojis.push(emoji);
             txRows.push([
                 r.date,
                 (r.desc + cuotaLabel).substring(0, 38),
-                r.cat.replace(/_/g,' ').substring(0, 20),
+                label.substring(0, 20),
                 r.amt > 0 ? `+$${r.amt.toFixed(2)}` : '',
                 r.amt < 0 ? `-$${Math.abs(r.amt).toFixed(2)}` : '',
                 `$${runBal.toFixed(2)}`,
@@ -890,7 +945,7 @@ function applyCon() {
             columnStyles: {
                 0: { cellWidth: 20 },
                 1: { cellWidth: 52 },
-                2: { cellWidth: 32 },
+                2: { cellWidth: 32, cellPadding: { top: 2.5, bottom: 2.5, left: 8, right: 2.5 } },
                 3: { cellWidth: 20, halign:'right', textColor: [16,120,70] },
                 4: { cellWidth: 20, halign:'right', textColor: [180,30,30] },
                 5: { cellWidth: 22, halign:'right', fontStyle:'bold' },
@@ -907,6 +962,11 @@ function applyCon() {
                         d.cell.styles.textColor = val >= 0 ? [16,120,70] : [180,30,30];
                     }
                 }
+            },
+            didDrawCell: (d) => {
+                if (d.section === 'body' && d.column.index === 2) {
+                    drawCellEmoji(doc, d.cell, txCatEmojis[d.row.index], 3.6);
+                }
             }
         });
 
@@ -918,6 +978,7 @@ function applyCon() {
             doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...ROJO);
             doc.text(`Cargos Pendientes (${pendientes.length})`, mar, y); y += 4;
 
+            const pendCatEmojis = [];
             const pendRows = pendientes.map(r => {
                 const deudaBase = r.cat === '📅_cuotas' ? Math.abs(r.amt)/r.total_cuotas : (r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt));
                 const abonado = r.abonado || 0;
@@ -927,10 +988,12 @@ function applyCon() {
                     const v = getDaysToPay(r.date, r.cuotas_pagadas || 0);
                     vencLabel = `${v.label} (${v.days}d)`;
                 }
+                const { emoji, label } = splitCatEmoji(r.cat);
+                pendCatEmojis.push(emoji);
                 return [
                     r.date,
                     r.desc.substring(0,35),
-                    r.cat.replace(/_/g,' ').substring(0,20),
+                    label.substring(0,20),
                     `-$${saldo.toFixed(2)}`,
                     vencLabel
                 ];
@@ -953,9 +1016,14 @@ function applyCon() {
                 columnStyles: {
                     0: { cellWidth: 22 },
                     1: { cellWidth: 60 },
-                    2: { cellWidth: 38 },
+                    2: { cellWidth: 38, cellPadding: { top: 3, bottom: 3, left: 9, right: 3 } },
                     3: { cellWidth: 28, halign:'right', textColor: ROJO },
                     4: { cellWidth: 36, halign:'center' }
+                },
+                didDrawCell: (d) => {
+                    if (d.section === 'body' && d.column.index === 2) {
+                        drawCellEmoji(doc, d.cell, pendCatEmojis[d.row.index]);
+                    }
                 }
             });
             y = doc.lastAutoTable.finalY + 10;
@@ -996,9 +1064,9 @@ function applyCon() {
             doc.roundedRect(mar, y, pageW - mar*2, 10, 2, 2, 'S');
             doc.setFillColor(...color);
             doc.rect(mar, y, 3, 10, 'F');
-            doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...color);
-            doc.text(o.icon, mar + 6, y + 6.5);
-            doc.setFont('helvetica','normal'); doc.setTextColor(...OSCURO);
+            const iconImg = emojiToPNG(o.icon);
+            if (iconImg) doc.addImage(iconImg, 'PNG', mar + 5.5, y + 2.5, 5, 5);
+            doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...OSCURO);
             doc.text(o.text, mar + 13, y + 6.5, { maxWidth: pageW - mar*2 - 16 });
             y += 13;
         });
