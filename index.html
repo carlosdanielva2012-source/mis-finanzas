@@ -123,7 +123,7 @@
             <div class="form-group"><label class="form-label">Descripción</label><input type="text" id="f_desc" class="input-ctrl" placeholder="Descripción"></div>
             <div class="form-group"><label class="form-label">Categoría</label><select id="f_cat" class="input-ctrl" onchange="handleCat(this.value)"></select></div>
             <div id="grpCuotas" class="form-group hidden"><label class="form-label">Total de cuotas</label><input type="number" id="f_cuotas" class="input-ctrl" inputmode="numeric" pattern="[0-9]*" placeholder="Ej: 3"></div>
-            <div class="form-group"><label class="form-label">Monto</label><input type="number" id="f_amt" class="input-ctrl" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+            <div class="form-group"><label class="form-label">Monto</label><input type="text" id="f_amt" class="input-ctrl" inputmode="numeric" placeholder="0.00" autocomplete="off" oninput="formatMoneyInput(this)"></div>
             <button class="btn-save" id="saveBtn" onclick="doSave()">Guardar Registro</button>
         </div>
     </div>
@@ -137,6 +137,14 @@
                 <input type="file" id="fileInput" class="hidden" accept=".json" onchange="importData(event)">
             </div>
             <button onclick="exportPDF()" style="width:100%; padding: 10px; border-radius: 8px; border: none; background: #1e293b; color: white; font-weight: bold; margin-bottom: 10px; cursor: pointer; font-size: 0.95rem;">📊 Exportar Auditoria PDF</button>
+            <div class="form-group" style="margin-bottom:8px;">
+                <label class="form-label" style="margin-bottom:3px;">Ordenar por</label>
+                <select id="sortMode" class="input-ctrl" style="padding:8px;" onchange="render()">
+                    <option value="recientes">🕒 Último agregado</option>
+                    <option value="liquidado">✅ Último liquidado</option>
+                    <option value="pendiente">⏳ Falta de pagar</option>
+                </select>
+            </div>
             <div style="display: flex; gap: 8px;">
                 <input type="date" id="filter_start" class="input-ctrl" style="padding: 8px;">
                 <input type="date" id="filter_end" class="input-ctrl" style="padding: 8px;">
@@ -168,6 +176,7 @@
                 <div>
                     <h2 style="font-size:0.85rem; font-weight:bold; margin:0;">Cobros Pendientes</h2>
                     <p style="font-size:0.65rem; opacity:0.7; font-style:italic; margin:2px 0 0;">Personal (Préstamos + Debo) + Corriente</p>
+                    <button onclick="waResetSeleccion()" title="Quitar todas las marcas" style="margin-top:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; font-size:0.65rem; font-weight:700; padding:4px 8px; border-radius:6px; cursor:pointer;">🔄 Quitar selección</button>
                 </div>
                 <div style="text-align:right;">
                     <p style="font-size:0.65rem; font-weight:bold; text-transform:uppercase; opacity:0.6; margin:0;">Total Seleccionado</p>
@@ -200,6 +209,18 @@
 <script>
     let db, curAcc = 'personal', curSub = 'agricola', selIds = [], selNames = [], selAmounts = {}, tSum = 0;
     let selCatsMap = {}, conNetSigned = null;
+    // Bandera que indica que una conciliación (selección de pendientes a liquidar) fue
+    // realmente CONFIRMADA con "Cargar Pago" y sigue vigente para el próximo Guardar.
+    // Sin esta bandera, una selección abandonada (cancelada, o al cambiar de cuenta/categoría)
+    // podía quedar "pegada" y aplicarse por error a un registro completamente distinto.
+    let conciliationActive = false;
+
+    // Limpia todo el estado de una conciliación en curso. Se llama al cancelar el modal,
+    // al cambiar de cuenta/subcuenta, al cambiar de categoría, o tras guardar.
+    function clearConciliacion() {
+        selIds = []; selNames = []; selAmounts = {}; selCatsMap = {};
+        tSum = 0; conNetSigned = null; conciliationActive = false;
+    }
     const incomeRules = ['quincena', 'ahorro', '💳_pago', '🤑_pago_prestamo'];
     const limits = { agricola: 400, cuscatlan: 810 };
 
@@ -214,6 +235,18 @@
         let d = e.target.result; 
         if(!d.objectStoreNames.contains("trans")) d.createObjectStore("trans", { keyPath: "id", autoIncrement: true });
     };
+
+    // Entrada de monto estilo "app de banco": se escribe de derecha a izquierda —
+    // el primer dígito llena los centavos, el segundo las décimas, y así sucesivamente
+    // van corriendo hacia los enteros. Ej: escribir 1,2,3,4 da 0.01 → 0.12 → 1.23 → 12.34
+    function formatMoneyInput(el) {
+        let digits = el.value.replace(/\D/g, '');       // solo dígitos, sin signos ni puntos
+        if (digits.length > 10) digits = digits.slice(-10); // límite razonable (hasta $99,999,999.99)
+        if (digits === '') { el.value = ''; return; }
+        const cents = parseInt(digits, 10);
+        el.value = (cents / 100).toFixed(2);
+        try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {}
+    }
 
     function todayLocalISO() {
         const d = new Date();
@@ -259,6 +292,7 @@
     }
 
     function changeAcc(a) {
+        clearConciliacion(); // Cambiar de cuenta cancela cualquier liquidación seleccionada y no confirmada
         curAcc = a;
         const isC = a === 'corriente';
         document.getElementById('mainCard').classList.toggle('corriente-mode', isC);
@@ -272,7 +306,11 @@
         refresh();
     }
 
-    function changeSub(s) {
+    function changeSub(s, internal = false) {
+        // internal=true se usa cuando la propia app cambia de subcuenta como parte de
+        // aplicar una conciliación ya confirmada (ver applyCon) o al refrescar ajustes;
+        // en ese caso NO se debe borrar la selección que se acaba de confirmar.
+        if (!internal) clearConciliacion();
         curSub = s;
         document.getElementById('btnSubAgri').classList.toggle('active', s==='agricola');
         document.getElementById('btnSubCusca').classList.toggle('active', s==='cuscatlan');
@@ -311,7 +349,7 @@
         const payDay = parseInt(document.getElementById('cfg_pay').value) || 6;
         accountSettings[curSub] = { cutDay, payDay };
         saveSettings();
-        changeSub(curSub); // Refresh display
+        changeSub(curSub, true); // Refresh display (no cancela selección en curso)
         closeModal();
         alert(`✅ Configuración guardada para ${curSub.toUpperCase()}: Corte día ${cutDay}, Pago día ${payDay}`);
     }
@@ -332,6 +370,10 @@
     }
 
     function handleCat(v) {
+        // Cambiar la categoría manualmente abandona cualquier selección de conciliación
+        // que estuviera pendiente de una elección anterior (evita que se aplique a un
+        // registro que en realidad es un cargo/gasto distinto).
+        clearConciliacion();
         document.getElementById('grpCuotas').classList.toggle('hidden', v !== '📅_cuotas');
         if (v.includes('pago') || v.includes('tarjeta')) openConciliacion(v);
     }
@@ -362,7 +404,7 @@ function openConciliacion(cat) {
                 <span id="manualSum" style="font-size:1.3rem; font-weight:bold; color:var(--primary-p);">$0.00</span>
             </div>
             <button onclick="applyCon()" class="btn-save" style="margin-top:15px;">Cargar Pago</button>
-            <button onclick="closeModal()" style="width:100%; border:none; margin-top:10px; color:gray; background:none; cursor:pointer;">Cancelar</button>`;
+            <button onclick="clearConciliacion(); closeModal();" style="width:100%; border:none; margin-top:10px; color:gray; background:none; cursor:pointer;">Cancelar</button>`;
         
         const list = document.getElementById('pList');
         if (pending.length === 0) {
@@ -451,8 +493,9 @@ function applyCon() {
     document.getElementById('f_amt').value = tSum.toFixed(2);
     if(selIds.length === 1) document.getElementById('f_desc').value = "Abono: " + selNames[0];
     else document.getElementById('f_desc').value = `Abono: ${selIds.length} items`;
-    if(curAcc === 'personal') { curSub = tempSub; changeSub(tempSub); }
-    closeModal(); 
+    if(curAcc === 'personal') { curSub = tempSub; changeSub(tempSub, true); }
+    conciliationActive = true; // Confirmado: al Guardar sí debe liquidar estos ítems
+    closeModal();
 }
 
     function closeModal() { document.getElementById('modalGeneric').classList.remove('show'); }
@@ -483,54 +526,79 @@ function applyCon() {
         else if (ca === '🏦_prestamo') initialStatus = 'pending';
         else initialStatus = 'paid';
 
-        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status: initialStatus, kids:[...selIds], kidAmounts:{...selAmounts}, ts:Date.now() };
+        // IMPORTANTE: kids/kidAmounts sólo se guardan si esta selección de conciliación
+        // fue realmente confirmada con "Cargar Pago" (conciliationActive). Si quedó una
+        // selección vieja "pegada" de una conciliación cancelada o de otra cuenta, este
+        // registro (que puede ser un cargo/gasto normal) NO debe arrastrarla ni marcar
+        // esos ítems como liquidados.
+        const entry = { date:d, desc:de, cat:ca, amt:finalAmt, acc:curAcc, subAcc: curSub, status: initialStatus,
+            kids: conciliationActive ? [...selIds] : [], kidAmounts: conciliationActive ? {...selAmounts} : {}, ts:Date.now() };
         if (ca === '📅_cuotas') { entry.total_cuotas = parseInt(document.getElementById('f_cuotas').value) || 1; entry.cuotas_pagadas = 0; }
         if (ca === '🫴_debo') { entry.debtAmt = am; }
 
         if (curAcc === 'personal' && ca === '💳_pago_tarjeta') {
-            st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', subAcc: curSub, status:'paid', ts:Date.now() + 1 });
+            // Registro espejo en Corriente: debe llevar los mismos kids/kidAmounts que el
+            // registro de Personal, y marcar de dónde vino el dinero — así al revisar el
+            // Historial de Corriente y tocar este "PAGO", sí se ve qué ítems liquidó.
+            // isMirror:true = este registro es sólo el "recibo" espejo en Corriente; la
+            // liquidación real de los ítems la controla el registro de Personal (arriba),
+            // así que al borrar SOLO este espejo no se debe revertir nada de nuevo
+            // (evita revertir dos veces si luego también se borra el de Personal).
+            st.add({ date:d, desc: `PAGO: ${de}`, cat: '💳_pago', amt: am, acc: 'corriente', subAcc: curSub, status:'paid',
+                kids: conciliationActive ? [...selIds] : [], kidAmounts: conciliationActive ? {...selAmounts} : {},
+                originAcc: 'personal', isMirror: true, ts:Date.now() + 1 });
         }
 
-        // Aplicar abonos POR ÍTEM según selAmounts
-        selIds.forEach(id => {
-            const montoAplicar = selAmounts[id] || 0;
-            if (montoAplicar <= 0) return;
-            st.get(id).onsuccess = (e) => {
-                let res = e.target.result;
-                if(!res) return;
-                let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : (res.cat === '🫴_debo' ? (res.debtAmt||0) : Math.abs(res.amt));
-                let yaAbonado = res.abonado || 0;
-                let pendiente = deudaTotal - yaAbonado;
+        // Aplicar abonos POR ÍTEM según selAmounts — únicamente si esta conciliación fue confirmada.
+        if (conciliationActive) {
+            selIds.forEach(id => {
+                const montoAplicar = selAmounts[id] || 0;
+                if (montoAplicar <= 0) return;
+                st.get(id).onsuccess = (e) => {
+                    let res = e.target.result;
+                    if(!res) return;
+                    let deudaTotal = res.cat === '📅_cuotas' ? (Math.abs(res.amt)/res.total_cuotas) : (res.cat === '🫴_debo' ? (res.debtAmt||0) : Math.abs(res.amt));
+                    let yaAbonado = res.abonado || 0;
+                    let pendiente = deudaTotal - yaAbonado;
 
-                if (montoAplicar >= pendiente) {
-                    if (res.cat === '📅_cuotas') {
-                        res.cuotas_pagadas++;
-                        res.abonado = 0;
-                        if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
-                    } else { 
-                        res.status = 'paid'; 
-                        res.abonado = pendiente;
+                    if (montoAplicar >= pendiente) {
+                        if (res.cat === '📅_cuotas') {
+                            res.cuotas_pagadas++;
+                            res.abonado = 0;
+                            if(res.cuotas_pagadas >= res.total_cuotas) res.status = 'paid';
+                        } else {
+                            res.status = 'paid';
+                            res.abonado = pendiente;
+                        }
+                    } else {
+                        res.abonado = yaAbonado + montoAplicar;
                     }
-                } else {
-                    res.abonado = yaAbonado + montoAplicar;
-                }
-                st.put(res);
-            };
-        });
 
-        st.add(entry).onsuccess = () => { 
-            resetUI(); 
-            refresh(); 
+                    // --- Bitácora: guarda la fecha (y hora) de cada abono en el propio ítem ---
+                    res.lastPaymentDate = d;
+                    res.lastPaymentTs = Date.now();
+                    if (res.status === 'paid') { res.paidDate = d; res.paidTs = res.lastPaymentTs; }
+                    if (!Array.isArray(res.historialPagos)) res.historialPagos = [];
+                    res.historialPagos.push({ date: d, ts: res.lastPaymentTs, monto: montoAplicar, desc: de, acc: curAcc });
+
+                    st.put(res);
+                };
+            });
+        }
+
+        st.add(entry).onsuccess = () => {
+            resetUI();
+            refresh();
             if(curAcc === 'corriente') render();
             updateCats();
         };
     }
 
-    function resetUI() { 
-        document.getElementById('f_desc').value=''; 
-        document.getElementById('f_amt').value=''; 
-        document.getElementById('f_cuotas').value=''; 
-        selIds=[]; selNames=[]; selAmounts={}; tSum=0; selCatsMap={}; conNetSigned=null;
+    function resetUI() {
+        document.getElementById('f_desc').value='';
+        document.getElementById('f_amt').value='';
+        document.getElementById('f_cuotas').value='';
+        clearConciliacion();
     }
 
     function refresh() {
@@ -570,25 +638,61 @@ function applyCon() {
         };
     }
 
+    // Para el orden "Falta de pagar": ¿este registro es una deuda pendiente?, y si lo es,
+    // qué tan urgente (días para el próximo pago; sin fecha de corte = prioridad media).
+    function pendienteInfo(r) {
+        const esDeuda = (r.amt < 0 || r.cat === '🫴_debo');
+        if (!esDeuda || r.status === 'paid') return { pendiente: false, dias: Infinity };
+        if (r.acc === 'corriente') {
+            const v = getDaysToPay(r.date, r.cuotas_pagadas || 0, r.subAcc);
+            return { pendiente: true, dias: v.days };
+        }
+        return { pendiente: true, dias: 999999 }; // préstamos/debo de personal no tienen fecha de corte
+    }
+
     function render() {
         const l = document.getElementById('listReg'); l.innerHTML = "";
         const start = document.getElementById('filter_start').value;
         const end = document.getElementById('filter_end').value;
+        const sortSel = document.getElementById('sortMode');
+        const sortMode = sortSel ? sortSel.value : 'recientes';
 
         db.transaction("trans","readonly").objectStore("trans").getAll().onsuccess = (e) => {
-            let all = e.target.result.filter(r => 
+            let all = e.target.result.filter(r =>
                 r.acc === curAcc && (curAcc === 'personal' ? true : (r.subAcc === curSub || (!r.subAcc && curSub === 'agricola')))
             );
 
             if (start || end) all = all.filter(r => (!start || r.date >= start) && (!end || r.date <= end));
 
-            let runningBalance = all.reduce((sum, r) => sum + r.amt, 0);
-            const sorted = all.sort((a,b) => {
-                // Primero ordena por fecha descendente
-                if (b.date !== a.date) return b.date.localeCompare(a.date);
-                // Si la fecha es igual, ordena por el timestamp de creación
-                return b.ts - a.ts;
-            });
+            // El saldo mostrado por registro siempre se calcula en orden CRONOLÓGICO real
+            // (fecha/ts ascendente), sin importar en qué orden se estén mostrando las filas.
+            const cronologico = [...all].sort((a,b) => a.date.localeCompare(b.date) || a.ts - b.ts);
+            let acumulado = 0;
+            const saldoPorId = new Map();
+            cronologico.forEach(r => { acumulado += r.amt; saldoPorId.set(r.id, acumulado); });
+
+            const ordenRecientes = (a,b) => (b.date !== a.date) ? b.date.localeCompare(a.date) : b.ts - a.ts;
+
+            let sorted;
+            if (sortMode === 'liquidado') {
+                // Más recientemente liquidado/pagado primero; lo nunca liquidado va al final.
+                sorted = [...all].sort((a,b) => {
+                    const ta = a.paidTs || (a.status === 'paid' ? a.ts : -Infinity);
+                    const tb = b.paidTs || (b.status === 'paid' ? b.ts : -Infinity);
+                    if (tb !== ta) return tb - ta;
+                    return ordenRecientes(a,b);
+                });
+            } else if (sortMode === 'pendiente') {
+                // Pendientes primero, con el vencimiento más próximo arriba; lo ya liquidado al final.
+                sorted = [...all].sort((a,b) => {
+                    const pa = pendienteInfo(a), pb = pendienteInfo(b);
+                    if (pa.pendiente !== pb.pendiente) return pa.pendiente ? -1 : 1;
+                    if (pa.pendiente && pa.dias !== pb.dias) return pa.dias - pb.dias;
+                    return ordenRecientes(a,b);
+                });
+            } else {
+                sorted = [...all].sort(ordenRecientes);
+            }
 
             sorted.forEach(r => {
                 let d = document.createElement('div');
@@ -596,29 +700,35 @@ function applyCon() {
                 const isDebo = r.cat === '🫴_debo';
                 const displayAmt = isDebo ? -(r.debtAmt || 0) : r.amt;
                 d.style.borderLeftColor = displayAmt > 0 ? 'var(--success)' : 'var(--danger)';
-                
+
                 let st = (r.amt < 0 || isDebo) ? (r.status === 'paid' ? '<span class="status-pill status-paid">✅</span>' : '<span class="status-pill status-pending">⏳</span>') : '';
                 let extra = r.cat === '📅_cuotas' ? `<br><small style="color:var(--primary-p); font-weight:bold;">CUOTA: ${r.cuotas_pagadas}/${r.total_cuotas}</small>` : '';
                 let bName = r.acc === 'corriente' ? `[${(r.subAcc||'AGRI').toUpperCase()}] ` : '';
 
                 let venc = (r.acc === 'corriente' && r.status === 'pending' && r.amt < 0) ? getDaysToPay(r.date, r.cuotas_pagadas || 0) : null;
 
+                // Fecha de liquidación/último abono, visible directamente en la lista (bitácora).
+                let liqLine = '';
+                if ((r.amt < 0 || isDebo)) {
+                    if (r.status === 'paid' && r.paidDate) liqLine = `<br><small style="color:#166534;">✅ Liquidado: ${r.paidDate}</small>`;
+                    else if (r.lastPaymentDate) liqLine = `<br><small style="color:#b45309;">⏳ Último abono: ${r.lastPaymentDate}</small>`;
+                }
+
                 d.innerHTML = `
                     <div class="reg-info">
                         <small>${r.date} ${st}</small>
                         <b>${bName}${r.cat.replace(/_/g,' ')}</b>
-                        <span>${r.desc}</span>${extra}
+                        <span>${r.desc}</span>${extra}${liqLine}
                         ${venc ? `<br><span class="vence-pill ${venc.days<5?'vence-danger':'vence-ok'}">Prox: ${venc.label} (${venc.days}d)</span>` : ''}
                     </div>
                     <div style="text-align:right; margin-right:30px">
                         <div style="font-weight:bold; color:${displayAmt>0?'var(--success)':'var(--danger)'}">${displayAmt>0?'+':''}$${Math.abs(displayAmt).toFixed(2)}</div>
-                        <div style="font-size:0.7rem; color:gray">${isDebo ? 'No afecta saldo' : 'Saldo: $'+runningBalance.toFixed(2)}</div>
+                        <div style="font-size:0.7rem; color:gray">${isDebo ? 'No afecta saldo' : 'Saldo: $'+(saldoPorId.get(r.id)||0).toFixed(2)}</div>
                     </div>
                     <button class="edit-btn">✏️</button>`;
-                
+
                 d.onclick = () => showDetail(r.id);
                 d.querySelector('.edit-btn').onclick = (ev) => { ev.stopPropagation(); editReg(r.id); };
-                runningBalance -= r.amt;
                 l.appendChild(d);
             });
         };
@@ -632,22 +742,36 @@ function applyCon() {
         const modal = document.getElementById('modalGeneric');
         const content = document.getElementById('modalContent');
         const dispAmt = r.cat === '🫴_debo' ? (r.debtAmt||0) : Math.abs(r.amt);
-        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()} (${(r.subAcc||'agricola').toUpperCase()})</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${dispAmt.toFixed(2)}${r.cat === '🫴_debo' ? ' <small style="color:#991b1b;">(deuda — no afecta saldo)</small>' : ''}</p>`;
+        let html = `<h3>Detalles</h3><p><b>Cuenta:</b> ${r.acc.toUpperCase()} (${(r.subAcc||'agricola').toUpperCase()})</p><p><b>Fecha:</b> ${r.date}</p><p><b>Descripción:</b> ${r.desc}</p><p><b>Monto:</b> $${dispAmt.toFixed(2)}${r.cat === '🫴_debo' ? ' <small style="color:#991b1b;">(deuda — no afecta saldo)</small>' : ''}</p>`;
+        if (r.originAcc) {
+            html += `<p style="font-size:0.8rem;color:#1d4ed8;"><b>💱 Pago realizado desde:</b> Cuenta ${r.originAcc === 'personal' ? 'Personal' : 'Corriente'}</p>`;
+        }
         if (r.amt < 0 || r.cat === '🫴_debo') {
             if (r.status === 'paid') {
-                html += `<p style="font-size:0.8rem;color:#166534;"><b>✅ Liquidado por completo.</b></p>`;
+                html += `<p style="font-size:0.8rem;color:#166534;"><b>✅ Liquidado por completo.</b>${r.paidDate ? ` — ${r.paidDate}` : ''}</p>`;
             } else if (r.abonado && r.abonado > 0) {
                 const restante = dispAmt - r.abonado;
-                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Pago parcial:</b> abonado $${r.abonado.toFixed(2)} de $${dispAmt.toFixed(2)} — <b>pendiente $${restante.toFixed(2)}</b></p>`;
+                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Pago parcial:</b> abonado $${r.abonado.toFixed(2)} de $${dispAmt.toFixed(2)} — <b>pendiente $${restante.toFixed(2)}</b>${r.lastPaymentDate ? ` (último abono: ${r.lastPaymentDate})` : ''}</p>`;
             } else if (r.cat === '📅_cuotas' && r.cuotas_pagadas > 0) {
-                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Cuotas pagadas:</b> ${r.cuotas_pagadas} de ${r.total_cuotas}</p>`;
+                html += `<p style="font-size:0.8rem;color:#b45309;"><b>⏳ Cuotas pagadas:</b> ${r.cuotas_pagadas} de ${r.total_cuotas}${r.lastPaymentDate ? ` (última: ${r.lastPaymentDate})` : ''}</p>`;
             } else {
                 html += `<p style="font-size:0.8rem;color:#991b1b;"><b>⏳ Pendiente de pago.</b></p>`;
             }
         }
+        // --- Bitácora: cada abono aplicado a este ítem, con su fecha ---
+        if (Array.isArray(r.historialPagos) && r.historialPagos.length > 0) {
+            html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;margin:8px 0;">
+                <small style="font-weight:700;color:#64748b;">🗓️ Bitácora de abonos</small>`;
+            r.historialPagos.forEach(p => {
+                html += `<div style="font-size:0.78rem;border-top:1px solid #eee;padding:4px 0;">${p.date} — $${p.monto.toFixed(2)} <span style="color:#94a3b8;">(desde ${p.acc === 'personal' ? 'Personal' : 'Corriente'} — "${p.desc}")</span></div>`;
+            });
+            html += `</div>`;
+        }
         html += `<hr>`;
-        const parent = all.find(p => p.kids && p.kids.includes(Number(id)));
-        if(parent) html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por:</small><br><b>${parent.desc}</b></div>`;
+        const parents = all.filter(p => p.kids && p.kids.includes(Number(id)));
+        parents.forEach(parent => {
+            html += `<div style="background:#dcfce7; padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #10b981;"><small>Liquidado por (${parent.date}):</small><br><b>${parent.desc}</b> <small style="color:#64748b;">[${parent.acc.toUpperCase()}]</small></div>`;
+        });
         if(r.kids && r.kids.length > 0) {
             html += `<h4>Liquidó a:</h4>`;
             r.kids.forEach(kId => {
@@ -693,15 +817,71 @@ function applyCon() {
         };
     }
 
+    // Revierte, uno por uno, los ítems que un registro de pago (padre) liquidó al guardarse,
+    // devolviéndolos a estado "pendiente" y restando el abono que ese pago les había aplicado.
+    // Se usa al borrar el pago, para que las cuentas dejen de creer que siguen liquidadas.
+    function revertirHijos(entry) {
+        return new Promise((resolve) => {
+            if (!entry || !entry.kids || entry.kids.length === 0) return resolve();
+            const tx = db.transaction("trans", "readwrite");
+            const st = tx.objectStore("trans");
+            let restantes = entry.kids.length;
+            entry.kids.forEach(kId => {
+                st.get(kId).onsuccess = (e) => {
+                    const res = e.target.result;
+                    if (res) {
+                        const montoAplicado = (entry.kidAmounts && entry.kidAmounts[kId] !== undefined) ? entry.kidAmounts[kId] : 0;
+                        if (res.cat === '📅_cuotas') {
+                            // Este pago había avanzado una cuota; se retrocede.
+                            if (res.cuotas_pagadas > 0) res.cuotas_pagadas--;
+                            res.abonado = 0;
+                            res.status = 'pending';
+                        } else {
+                            const nuevoAbonado = (res.abonado || 0) - montoAplicado;
+                            res.abonado = nuevoAbonado > 0.005 ? nuevoAbonado : 0;
+                            res.status = 'pending';
+                        }
+
+                        // Quita de la bitácora el abono que corresponde a este pago borrado,
+                        // y recalcula la última fecha de pago a partir de lo que quede.
+                        if (Array.isArray(res.historialPagos)) {
+                            const idx = res.historialPagos.findIndex(p =>
+                                p.date === entry.date && p.desc === entry.desc && Math.abs(p.monto - montoAplicado) < 0.005);
+                            if (idx > -1) res.historialPagos.splice(idx, 1);
+                        }
+                        if (res.historialPagos && res.historialPagos.length > 0) {
+                            const last = res.historialPagos[res.historialPagos.length - 1];
+                            res.lastPaymentDate = last.date; res.lastPaymentTs = last.ts;
+                        } else {
+                            delete res.lastPaymentDate; delete res.lastPaymentTs;
+                        }
+                        delete res.paidDate; delete res.paidTs; // ya no está liquidado por completo
+
+                        st.put(res);
+                    }
+                    restantes--;
+                    if (restantes === 0) resolve();
+                };
+            });
+            tx.onerror = () => resolve();
+        });
+    }
+
     function deleteReg(id) {
-        if(!confirm("¿Borrar registro?")) return;
-        const tx = db.transaction("trans", "readwrite");
-        tx.objectStore("trans").delete(id);
-        tx.oncomplete = () => {
-            closeModal();
-            render();
-            refresh();
-            if (document.getElementById('tab-whatsapp').classList.contains('active')) waRender();
+        if(!confirm("¿Borrar registro? Si este registro liquidó otros pendientes, esos ítems volverán a quedar pendientes.")) return;
+        db.transaction("trans","readonly").objectStore("trans").get(id).onsuccess = async (e) => {
+            const entry = e.target.result;
+            if (entry && entry.kids && entry.kids.length > 0 && !entry.isMirror) {
+                await revertirHijos(entry);
+            }
+            const tx = db.transaction("trans", "readwrite");
+            tx.objectStore("trans").delete(id);
+            tx.oncomplete = () => {
+                closeModal();
+                render();
+                refresh();
+                if (document.getElementById('tab-whatsapp').classList.contains('active')) waRender();
+            };
         };
     }
 
@@ -1197,6 +1377,14 @@ function applyCon() {
             list.appendChild(div);
         });
         waActualizarSumaTotal();
+    }
+
+    // Quita todas las marcas de "Cobros Pendientes" sin necesidad de recargar la página.
+    function waResetSeleccion() {
+        if (waSeleccionados.length === 0) return;
+        if (!confirm("¿Quitar la selección de cobros marcados?")) return;
+        waSeleccionados = [];
+        waRender();
     }
 
     function waToggleItem(id, saldo) {
